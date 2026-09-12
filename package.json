@@ -1,0 +1,62 @@
+{
+  "name": "tron-wallet-lessons",
+  "version": "0.1.0",
+  "scripts": {
+    "check": "node tools/check-env.js",
+    "new-wallet": "node tools/new-wallet.js",
+    "l01": "node lessons/01-secret-key/script.js",
+    "lesson01": "node lessons/01-secret-key/script.js",
+    "l02": "node lessons/02-key-to-address/script.js",
+    "lesson02": "node lessons/02-key-to-address/script.js",
+    "l03": "node lessons/03-read-balance/script.js",
+    "lesson03": "node lessons/03-read-balance/script.js",
+    "l04": "node lessons/04-bandwidth-energy/script.js",
+    "lesson04": "node lessons/04-bandwidth-energy/script.js",
+    "l05": "node lessons/05-build-and-sign/script.js",
+    "lesson05": "node lessons/05-build-and-sign/script.js",
+    "l06": "node lessons/06-send-testnet/script.js",
+    "lesson06": "node lessons/06-send-testnet/script.js",
+    "l07": "node lessons/07-receipt/script.js",
+    "lesson07": "node lessons/07-receipt/script.js",
+    "l08": "node lessons/08-sign-message/script.js",
+    "lesson08": "node lessons/08-sign-message/script.js",
+    "l09": "node lessons/09-trc20-approve/script.js",
+    "lesson09": "node lessons/09-trc20-approve/script.js",
+    "l10": "node lessons/10-simulate/script.js",
+    "lesson10": "node lessons/10-simulate/script.js",
+    "l11": "node lessons/11-bttc-same-key/script.js",
+    "lesson11": "node lessons/11-bttc-same-key/script.js",
+    "l12": "node lessons/12-error-detective/script.js",
+    "lesson12": "node lessons/12-error-detective/script.js",
+    "l13": "node lessons/13-audit-and-graduation/script.js",
+    "lesson13": "node lessons/13-audit-and-graduation/script.js",
+    "audit": "node lessons/13-audit-and-graduation/script.js",
+    "verify-readonly": "node tools/verify-readonly.js",
+    "expected": "node tools/make-expected-outputs.js",
+    "test": "node tools/verify-readonly.js"
+  },
+  "keywords": [
+    "tron",
+    "bttc",
+    "wallet",
+    "bip39",
+    "trc20",
+    "education",
+    "korean"
+  ],
+  "author": "",
+  "license": "MIT",
+  "description": "트론(TRON)과 BTTC로 배우는 암호화폐 지갑 — 초등학생부터 개발자·일반인까지 한 저장소로 배우는 13개 레슨",
+  "dependencies": {
+    "bip32": "^5.0.0-rc.0",
+    "bip39": "^3.1.0",
+    "dotenv": "^17.4.2",
+    "ethers": "^6.17.0",
+    "tiny-secp256k1": "^2.2.4",
+    "tronweb": "^6.5.0"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}

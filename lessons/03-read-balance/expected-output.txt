@@ -1,0 +1,65 @@
+$ npm run l03   # 데모 니모닉, SEND_TX=false, 2026-09-12 실행 (exit 0)
+
+Lesson 03 — 광장에 걸린 장부: 1 TRX는 사탕 100만 알
+네트워크: Nile 테스트넷 (https://nile.trongrid.io) — 읽기만 합니다. 서명·전송 없음.
+ℹ️  데모 모드: MNEMONIC/ADDRESS 가 없어(또는 데모 니모닉이라) 공개 데모 주소를 조회합니다.
+  조회 주소: TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH (데모 니모닉 (index 0))
+  hex 주소: 41c8599111f29c1e1e061265b4af93ea1f274ad78a
+  탐색기: https://nile.tronscan.org/#/address/TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+
+[1] 광장의 장부: 최신 블록과 확정 블록
+  최신 블록 번호: 70,900,868 (2026. 9. 12. 오후 11:52:57)
+  확정 블록 번호: 70,900,849 (2026. 9. 12. 오후 11:52:00)
+  차이: 19 블록 (블록은 약 3초마다 하나씩 붙고, 확정은 조금 뒤에 따라옵니다)
+  최신 블록에 담긴 트랜잭션 수: 4
+  ✅ 장부는 누구나 읽을 수 있습니다. 열쇠 없이도, 앱 없이도.
+  💬 getCurrentBlock 은 최신, getConfirmedCurrentBlock 은 solidified 블록. 잔고 확인은 확정 블록 기준이 안전합니다.
+
+[2] TRX 잔고 — 사탕(sun)으로 세고 사탕상자(TRX)로 읽기
+  잔고 (sun): 55,167,408,590 sun
+  잔고 (TRX): 55167.40859 TRX
+  환산 규칙: 1 TRX = 1,000,000 sun (10^6). TronWeb.fromSun / TronWeb.toSun
+  ✅ 이 숫자는 앱이 아니라 체인(장부)에서 왔습니다. 주소만 알면 누구나 같은 값을 봅니다.
+  💬 getBalance 는 sun(number). 계산은 sun 정수로 하고 표시할 때만 fromSun. 큰 값은 BigInt 로 다루세요.
+
+[3] 계정 정보 — 활성화 여부, 만든 날, 맡긴 TRX(스테이킹), TRC-10 토큰
+  ✅ 활성화된 계정입니다 (장부에 이 주소의 장이 있습니다).
+  계정 생성 시각: 2021. 7. 18. 오후 8:08:54 (create_time 1626606534000)
+  맡긴 TRX (frozenV2): BANDWIDTH=17949 TRX, ENERGY=17950 TRX, TRON_POWER=0 TRX
+  TRC-10 토큰 수: 1
+  TRC-10 #1005416: TRN (TN) 300 개 — precision 6
+  💬 getAccount → {} 이면 미활성화. frozenV2 는 Stake 2.0, assetV2 는 TRC-10. 사용량 0 인 필드는 생략되니 ?? 0 처리.
+
+[4] USDT(TRC-20) — 사탕통 장부는 컨트랙트가 따로 관리합니다
+  USDT 컨트랙트 주소: TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf
+  체인에 기록된 컨트랙트 이름: TetherToken (ABI 항목 46개)
+  name / symbol / decimals: Tether USD / USDT / 6
+  totalSupply: 17600000000030 USDT (최소 단위 17,600,000,000,030,000,000)
+  balanceOf (최소 단위): 19,589,654,444
+  balanceOf (사람 단위): 19589.654444 USDT
+  ✅ TRX 잔고는 getBalance, USDT 잔고는 컨트랙트의 balanceOf. 장부가 둘입니다.
+  💬 TRC-20 = ERC-20 ABI. balanceOf 는 uint256(bigint) → formatUnits(raw, decimals). tronweb.contract 는 JSON ABI 객체 배열만 받습니다.
+
+[5] 가짜 토큰 경고 — 토큰은 이름이 아니라 컨트랙트 주소로 알아봅니다
+  이름 "USDT" 는: 누구나 컨트랙트를 만들 때 붙일 수 있는 글자입니다. 심볼도, 이름도, 로고도 복사할 수 있습니다.
+  바꿀 수 없는 것: 컨트랙트 주소. 이 강의가 쓰는 Nile 의 USDT 는 TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf 입니다.
+  ⚠️  같은 이름 "USDT" 라도 컨트랙트 주소가 다르면 완전히 다른 토큰입니다. 받은 토큰의 주소를 꼭 확인하세요.
+  내 주소 페이지: https://nile.tronscan.org/#/address/TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  USDT 컨트랙트 페이지: https://nile.tronscan.org/#/contract/TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf (경로 패턴 확인 필요)
+  USDT 토큰 페이지: https://nile.tronscan.org/#/token20/TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf (경로 패턴 확인 필요)
+
+[6] 계정 권한 — 이 상자의 열쇠 구멍 주인은 나인가?
+  owner_permission.keys[0].address: 41156f4463ce90ac11e1855ff99e4273806ad847cf
+  내 hex 주소: 41c8599111f29c1e1e061265b4af93ea1f274ad78a
+  ⚠️  권한 키 ≠ 내 주소! 누군가 updateAccountPermissions 로 owner 권한을 자기 키로 바꿔 두었습니다.
+  왜?: 데모 니모닉은 전 세계에 공개된 값입니다. 공개된 니모닉의 주소는 이미 남의 것입니다.
+  결과: 이 주소는 조회·시뮬레이션은 되지만, 원래 열쇠로는 아무것도 보낼 수 없습니다. (Lesson 13 에서 자세히)
+  💬 정상 계정은 owner_permission.keys[0].address === 계정 hex. 점검 스크립트에 이 비교를 넣으세요(Lesson 13).
+
+요약
+  주소 TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  TRX  55167.40859 TRX (55,167,408,590 sun)
+  USDT 19589.654444 USDT @ TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf
+  규칙 3: 잔고는 앱이 아니라 장부(탐색기)에서 확인하고, 토큰은 이름이 아니라 컨트랙트 주소로 알아본다.
+
+➡️ 다음: Lesson 04 연료 — 대역폭 입장권과 에너지 입장권 (npm run l04)

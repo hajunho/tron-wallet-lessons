@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>허락증 판독기 — approve / transfer / transferFrom calldata 해독</title>
+<meta name="description" content="TRC-20 approve·transfer·transferFrom calldata(hex)를 붙여넣으면 함수·spender·금액을 사람이 읽는 말로 풀어 줍니다. 무제한 허락(2^256−1)이면 경고. 연습 나라 전용, 외부 요청은 ethers 라이브러리 한 개뿐.">
+<style>
+  /* 단일 파일. 색만으로 뜻을 나타내지 않고 글자·기호(✅ ⚠️ ❌)를 항상 함께 쓴다. */
+  :root {
+    --bg: #fbfaf7; --fg: #1f2328; --muted: #5b6470; --line: #d9d4c7;
+    --card: #ffffff; --accent: #1f5f8b; --accent-fg: #ffffff;
+    --ok-bg: #e6f4ea; --ok-fg: #1e5e2b; --bad-bg: #fdecec; --bad-fg: #8a1c1c; --bad-line: #b3261e;
+    --warn-bg: #fff4d6; --warn-fg: #6b4a00;
+    --sel-bg: #dbe9f6; --w1-bg: #e4f1e6; --w2-bg: #fbe7d3; --w3-bg: #ece4f7; --extra-bg: #ffd1d1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15181c; --fg: #e8e6e1; --muted: #a3a9b3; --line: #3a4048;
+      --card: #1e2227; --accent: #7fb4dc; --accent-fg: #0f1418;
+      --ok-bg: #173a22; --ok-fg: #b7e6c2; --bad-bg: #4a1a1a; --bad-fg: #ffc1c1; --bad-line: #ff8a80;
+      --warn-bg: #4a3a10; --warn-fg: #ffe4a1;
+      --sel-bg: #1d3a52; --w1-bg: #1d3d26; --w2-bg: #4a2f16; --w3-bg: #3a2a52; --extra-bg: #6b1d1d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.45rem; margin: 8px 0 4px; }
+  h2 { font-size: 1.15rem; margin: 0 0 8px; }
+  h3 { font-size: 1rem; margin: 12px 0 4px; }
+  p { margin: 6px 0; }
+  .sub { color: var(--muted); font-size: 0.95rem; }
+  .banner { border: 2px solid var(--warn-fg); background: var(--warn-bg); color: var(--warn-fg); border-radius: 10px; padding: 10px 12px; margin: 12px 0; font-weight: 600; }
+  .banner small { display: block; font-weight: 400; margin-top: 4px; }
+  .banner.bad { border-color: var(--bad-line); background: var(--bad-bg); color: var(--bad-fg); }
+  nav.lessons { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px; }
+  nav.lessons a { display: inline-block; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--accent); text-decoration: none; font-size: 0.92rem; }
+  nav.lessons a:hover, nav.lessons a:focus-visible { border-color: var(--accent); }
+  section.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 14px 0; }
+  label { display: block; font-weight: 600; margin-bottom: 4px; }
+  textarea, input[type="text"], select {
+    width: 100%; font: 15px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg);
+  }
+  textarea { min-height: 96px; resize: vertical; }
+  select { width: auto; font-family: inherit; }
+  textarea:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; align-items: center; }
+  button { font: inherit; font-size: 0.95rem; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); cursor: pointer; }
+  button.secondary { background: var(--card); color: var(--accent); }
+  button[disabled] { opacity: 0.5; cursor: not-allowed; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; overflow-wrap: anywhere; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.95rem; }
+  th, td { text-align: left; vertical-align: top; padding: 6px 4px; border-top: 1px solid var(--line); }
+  th { width: 34%; font-weight: 600; color: var(--muted); }
+  .verdict { display: block; padding: 10px 12px; border-radius: 8px; font-weight: 700; margin: 8px 0; border: 2px solid transparent; }
+  .verdict.ok { background: var(--ok-bg); color: var(--ok-fg); border-color: var(--ok-fg); }
+  .verdict.warn { background: var(--warn-bg); color: var(--warn-fg); border-color: var(--warn-fg); }
+  .verdict.bad { background: var(--bad-bg); color: var(--bad-fg); border-color: var(--bad-line); }
+  .verdict.idle { background: var(--bg); color: var(--muted); border-color: var(--line); }
+  .verdict small { display: block; font-weight: 400; margin-top: 4px; }
+  .words { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+  .words li { border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  .words .tag { display: inline-block; font-weight: 700; margin-bottom: 4px; }
+  .words li.sel { background: var(--sel-bg); }
+  .words li.w1 { background: var(--w1-bg); }
+  .words li.w2 { background: var(--w2-bg); }
+  .words li.w3 { background: var(--w3-bg); }
+  .words li.extra { background: var(--extra-bg); }
+  .amount-big { font-size: 1.3rem; font-weight: 700; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; font-weight: 600; }
+  footer { color: var(--muted); font-size: 0.85rem; margin: 20px 0; }
+  .hidden { display: none !important; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>📜 허락증 판독기</h1>
+  <p class="sub">지갑 앱이 보여 주는 <span class="mono">095ea7b3…</span> 같은 hex(calldata)를 붙여넣으면 "어떤 함수에, 누구에게, 얼마"인지 사람이 읽는 말로 풀어 줘요. 네트워크에 아무것도 보내지 않고 브라우저 안에서만 계산해요.</p>
+
+  <div class="banner" role="note" aria-label="안전 경고">
+    ⚠️ 여기에는 <u>트랜잭션 data(hex)와 주소만</u> 넣으세요. 12단어(니모닉)나 열쇠(개인키)는 이 페이지를 포함해 어떤 웹페이지에도 절대 입력하지 마세요.
+    <small>규칙 8: 무엇에 도장 찍는지 읽지 못하면 찍지 않는다. 규칙 9: 허락(approve)은 필요한 만큼만, 다 쓰면 0으로. 이 페이지는 입력값을 어디에도 전송하지 않아요.</small>
+  </div>
+
+  <nav class="lessons" aria-label="관련 레슨">
+    <a href="../lessons/09-trc20-approve/README.md">📘 Lesson 09 사탕통 장부와 허락증(TRC-20)</a>
+    <a href="../lessons/10-simulate/README.md">📘 Lesson 10 리허설: 보내기 전에 미리 해보기</a>
+    <a href="index.html">🏠 놀이터 허브</a>
+  </nav>
+
+  <div id="ethers-missing" class="banner bad hidden" role="alert">
+    ❌ ethers 라이브러리를 불러오지 못했어요(인터넷 연결이 필요해요). 판독기가 동작하지 않습니다. 연결 후 새로고침하세요.
+  </div>
+
+  <!-- ===================== 1. 입력 ===================== -->
+  <section class="card" aria-labelledby="h-input">
+    <h2 id="h-input">1️⃣ hex 붙여넣기</h2>
+    <p class="sub">앞 4바이트(선택자)가 <span class="mono">095ea7b3</span>=approve, <span class="mono">a9059cbb</span>=transfer, <span class="mono">23b872dd</span>=transferFrom 인지 판별하고, 그 뒤 32바이트 조각들을 주소와 금액으로 풀어요. <span class="mono">0x</span>가 있어도 없어도, 줄바꿈·공백이 섞여 있어도 돼요.</p>
+    <label for="hex-input">calldata (data) hex</label>
+    <textarea id="hex-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="예: 0x095ea7b3000000000000000000000000b6e708a39781c96bd399c7657780ff9fe9f052a8…" aria-describedby="hex-help"></textarea>
+    <p id="hex-help" class="sub">입력하는 즉시 해독해요. 예시 버튼은 데모 니모닉의 두 번째 주소(TSeJ…)를 spender/받는 사람으로 쓴 공개 값이에요.</p>
+    <div class="row" role="group" aria-label="예시 넣기">
+      <button type="button" id="btn-ex-approve">예시 ① 정상 approve (3 USDT)</button>
+      <button type="button" id="btn-ex-unlimited">예시 ② 무제한 approve</button>
+      <button type="button" id="btn-ex-transfer">예시 ③ transfer (1 USDT)</button>
+      <button type="button" id="btn-clear" class="secondary">지우기</button>
+    </div>
+    <div class="row">
+      <label for="decimals" style="margin:0">소수 자릿수(decimals)</label>
+      <select id="decimals" aria-describedby="decimals-help">
+        <option value="0">0 (정수 토큰)</option>
+        <option value="6" selected>6 (USDT, TRX)</option>
+        <option value="8">8</option>
+        <option value="18">18 (BTT 등 EVM 기본)</option>
+      </select>
+      <span id="decimals-help" class="sub">토큰마다 달라요. Nile 테스트 USDT는 6.</span>
+    </div>
+    <div class="row">
+      <label for="contract-input" style="margin:0; width:100%">토큰 컨트랙트 주소 (선택, T…)</label>
+      <input id="contract-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="예: TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf" aria-describedby="contract-help">
+      <span id="contract-help" class="sub">hex 안에는 "어떤 토큰인지"가 없어요. 토큰은 트랜잭션의 contract_address 로만 알 수 있어요(규칙 3). 넣으면 Nile 테스트 USDT 인지 확인해요.</span>
+      <span id="contract-verdict" class="sub" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <!-- ===================== 2. 판정 ===================== -->
+  <section class="card" aria-labelledby="h-result">
+    <h2 id="h-result">2️⃣ 판독 결과</h2>
+    <div id="verdict" class="verdict idle" aria-live="polite">⏳ hex 를 넣으면 결과가 나와요.</div>
+    <table id="result-table" class="hidden" aria-label="해독 결과">
+      <tbody id="result-body"></tbody>
+    </table>
+    <h3 id="h-words" class="hidden">hex 조각내기 (4바이트 + 32바이트씩)</h3>
+    <ol id="words" class="words" aria-labelledby="h-words"></ol>
+  </section>
+
+  <!-- ===================== 3. 읽는 법 ===================== -->
+  <section class="card" aria-labelledby="h-howto">
+    <h2 id="h-howto">3️⃣ 읽는 법</h2>
+    <details open>
+      <summary>calldata 는 어떻게 생겼나요?</summary>
+      <p>앞 4바이트는 <b>선택자</b>(함수 이름의 keccak256 앞 4바이트)이고, 그 뒤는 32바이트씩 인자예요. 주소는 20바이트라서 앞 12바이트가 0으로 채워져 있고, 금액은 소수점 없는 최소 단위 정수예요(USDT 6자리: 3 USDT = 3,000,000).</p>
+      <table>
+        <tbody>
+          <tr><th scope="row">approve(spender, amount)</th><td><span class="mono">095ea7b3</span> — 허락증(allowance). "spender 가 내 사탕통에서 amount 까지 꺼내 가도 됨". 내 잔고는 안 움직여요.</td></tr>
+          <tr><th scope="row">transfer(to, amount)</th><td><span class="mono">a9059cbb</span> — 내 사탕통에서 to 에게 amount 보내기. 되돌릴 수 없어요(규칙 6).</td></tr>
+          <tr><th scope="row">transferFrom(from, to, amount)</th><td><span class="mono">23b872dd</span> — 허락받은 spender 가 from 의 사탕통에서 to 로 꺼내 가기. 허락증이 쓰이는 순간이에요. (이 선택자는 함수 이름의 keccak256 앞 4바이트를 계산한 값이고, 레슨 실행으로 직접 관찰한 것은 approve <span class="mono">095ea7b3</span> 와 transfer <span class="mono">a9059cbb</span> 두 개입니다.)</td></tr>
+        </tbody>
+      </table>
+    </details>
+    <details>
+      <summary>무제한 허락은 왜 위험한가요?</summary>
+      <p>amount 가 <span class="mono">ffff…ffff</span>(2^256−1)이면 그 spender 는 내 토큰 <b>전부</b>를, 앞으로 들어올 토큰까지 언제든 꺼내 갈 수 있어요. 앱의 "무제한 승인(Unlimited)"이 바로 이거예요. 필요한 만큼만 허락하고, 다 쓰면 <span class="mono">approve(spender, 0)</span>으로 0으로 돌리세요.</p>
+    </details>
+    <details>
+      <summary>트론과 EVM 의 차이</summary>
+      <p>선택자와 인자 인코딩은 EVM(ERC-20)과 똑같아요. 다른 점은 주소 표기뿐: calldata 안 20바이트 앞에 <span class="mono">41</span>을 붙이고 base58check 로 감싸면 <span class="mono">T…</span> 주소가 돼요(Lesson 02). 이 페이지는 sha256 두 번 → 앞 4바이트 체크섬 → base58 을 직접 계산해요.</p>
+    </details>
+  </section>
+
+  <footer>
+    예시의 주소 <span class="mono">TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK</span>는 공개된 데모 니모닉(abandon ×11 about)의 두 번째 주소(index 1)예요. 공개된 니모닉의 주소는 이미 남의 것과 같아요(Lesson 13). 이 페이지의 외부 요청은 ethers 6.17.0 라이브러리 한 개뿐이에요.
+  </footer>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.17.0/ethers.umd.min.js"></script>
+
+<!-- core-start: 순수 로직. 브라우저에서는 window.ApproveDecoder, node 에서는 module.exports 로 노출 -->
+<script id="decoder-core">
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) {
+    module.exports = factory(require('ethers'));
+  } else {
+    root.ApproveDecoder = factory(root.ethers);
+  }
+})(typeof self !== 'undefined' ? self : this, function (ethers) {
+  'use strict';
+
+  var TRON_PREFIX = '41';
+  var MAX_UINT256 = (1n << 256n) - 1n;
+  // 사람이 읽는 수가 이 값 이상이면 "사실상 무제한"으로 본다(이 페이지의 기준, 천조 개 = 10^15).
+  var PRACTICALLY_UNLIMITED = 10n ** 15n;
+
+  var KNOWN_ADDRESSES = {
+    TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH: '데모 니모닉 index 0 (공개 주소)',
+    TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK: '데모 니모닉 index 1 (공개 주소)',
+    TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf: 'Nile 테스트 USDT 컨트랙트 (TetherToken, decimals 6)'
+  };
+  var NILE_USDT = 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf';
+
+  var FUNCTIONS = {
+    '095ea7b3': { name: 'approve', signature: 'approve(address,uint256)', args: [
+      { name: 'spender', type: 'address', label: '허락받는 쪽(spender)' },
+      { name: 'amount', type: 'uint256', label: '허락 상한(amount)' }
+    ] },
+    'a9059cbb': { name: 'transfer', signature: 'transfer(address,uint256)', args: [
+      { name: 'to', type: 'address', label: '받는 쪽(to)' },
+      { name: 'amount', type: 'uint256', label: '보내는 양(amount)' }
+    ] },
+    '23b872dd': { name: 'transferFrom', signature: 'transferFrom(address,address,uint256)', args: [
+      { name: 'from', type: 'address', label: '꺼내 오는 사탕통(from)' },
+      { name: 'to', type: 'address', label: '받는 쪽(to)' },
+      { name: 'amount', type: 'uint256', label: '꺼내는 양(amount)' }
+    ] }
+  };
+
+  var EXAMPLES = {
+    approve: '0x095ea7b3000000000000000000000000b6e708a39781c96bd399c7657780ff9fe9f052a800000000000000000000000000000000000000000000000000000000002dc6c0',
+    unlimited: '0x095ea7b3000000000000000000000000b6e708a39781c96bd399c7657780ff9fe9f052a8ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+    transfer: '0xa9059cbb000000000000000000000000b6e708a39781c96bd399c7657780ff9fe9f052a800000000000000000000000000000000000000000000000000000000000f4240'
+  };
+
+  // ---------- 바이트 도우미 ----------
+  function bytesToHex(bytes) {
+    return ethers.hexlify(bytes).slice(2);
+  }
+  function hexToBytes(hex) {
+    return ethers.getBytes('0x' + hex);
+  }
+  function concatBytes(a, b) {
+    var out = new Uint8Array(a.length + b.length);
+    out.set(a, 0);
+    out.set(b, a.length);
+    return out;
+  }
+
+  // ---------- base58check (Lesson 02 와 같은 알고리즘) ----------
+  /** payload(바이트) → sha256 두 번의 앞 4바이트 */
+  function checksumOf(payloadBytes) {
+    return ethers.getBytes(ethers.sha256(ethers.sha256(payloadBytes))).slice(0, 4);
+  }
+  /** 21바이트 hex('41' + 40hex) → base58check T주소 */
+  function encodeBase58Check(payloadHex) {
+    var payload = hexToBytes(payloadHex);
+    var checksum = checksumOf(payload);
+    return ethers.encodeBase58(concatBytes(payload, checksum));
+  }
+  /** T주소 → { ok, payloadHex('41'+40hex) } (체크섬 검사 포함) */
+  function decodeBase58Check(str) {
+    if (typeof str !== 'string' || str.length === 0) return { ok: false, reason: 'empty' };
+    var bytes;
+    try {
+      var big = ethers.decodeBase58(str);
+      var hex = big.toString(16);
+      if (hex.length % 2 === 1) hex = '0' + hex;
+      // 앞자리 '1'(=0x00) 복원
+      var leading = 0;
+      while (leading < str.length && str[leading] === '1') leading += 1;
+      hex = '00'.repeat(leading) + hex;
+      bytes = hexToBytes(hex);
+    } catch (e) {
+      return { ok: false, reason: 'char' };
+    }
+    if (bytes.length !== 25) return { ok: false, reason: 'length' };
+    var payload = bytes.slice(0, 21);
+    var given = bytesToHex(bytes.slice(21));
+    var expected = bytesToHex(checksumOf(payload));
+    if (given !== expected) return { ok: false, reason: 'checksum' };
+    var payloadHex = bytesToHex(payload);
+    if (payloadHex.slice(0, 2) !== TRON_PREFIX) return { ok: false, reason: 'prefix' };
+    return { ok: true, payloadHex: payloadHex };
+  }
+
+  /** 20바이트 hex(40hex) → { evm(0x 체크섬 표기), hex41, tron(T주소), label } */
+  function addressViews(hex40) {
+    var lower = hex40.toLowerCase();
+    var evm;
+    try { evm = ethers.getAddress('0x' + lower); } catch (e) { evm = '0x' + lower; }
+    var tron = encodeBase58Check(TRON_PREFIX + lower);
+    return { evm: evm, hex41: TRON_PREFIX + lower, tron: tron, label: KNOWN_ADDRESSES[tron] || null };
+  }
+
+  // ---------- 입력 정리 ----------
+  /** 공백·줄바꿈 제거, 0x 제거, 소문자. 반환 { ok, hex, reason } */
+  function normalizeHex(text) {
+    if (typeof text !== 'string') return { ok: false, reason: 'empty' };
+    var s = text.replace(/\s+/g, '');
+    if (s.length === 0) return { ok: false, reason: 'empty' };
+    if (s.slice(0, 2).toLowerCase() === '0x') s = s.slice(2);
+    if (!/^[0-9a-fA-F]*$/.test(s)) return { ok: false, reason: 'char' };
+    if (s.length % 2 === 1) return { ok: false, reason: 'odd' };
+    if (s.length < 8) return { ok: false, reason: 'short' };
+    return { ok: true, hex: s.toLowerCase() };
+  }
+
+  // ---------- 금액 ----------
+  /** 최소 단위 BigInt → 사람이 읽는 문자열(천 단위 쉼표, 소수 뒤 0 제거) */
+  function formatAmount(raw, decimals) {
+    var d = Number(decimals);
+    if (!Number.isInteger(d) || d < 0 || d > 77) throw new Error('decimals 는 0~77 정수여야 해요');
+    var base = 10n ** BigInt(d);
+    var intPart = raw / base;
+    var fracPart = raw % base;
+    var intStr = intPart.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    if (d === 0) return intStr;
+    var fracStr = fracPart.toString().padStart(d, '0').replace(/0+$/, '');
+    return fracStr.length ? intStr + '.' + fracStr : intStr;
+  }
+
+  /** 무제한 판정: 'max' (정확히 2^256−1) | 'huge' (사실상 무제한) | null */
+  function unlimitedKind(raw, decimals) {
+    if (raw === MAX_UINT256) return 'max';
+    var base = 10n ** BigInt(Number(decimals));
+    if (raw / base >= PRACTICALLY_UNLIMITED) return 'huge';
+    return null;
+  }
+
+  // ---------- 해독 ----------
+  /**
+   * calldata 해독.
+   * 반환 { ok, reason?, hex, selector, fn(null|{name,signature}), words[], args[], amount?, verdict }
+   * verdict: 'ok' | 'unlimited' | 'huge' | 'unknown' | 'malformed'
+   */
+  function decodeCalldata(text, decimals) {
+    var norm = normalizeHex(text);
+    if (!norm.ok) return { ok: false, reason: norm.reason };
+    var hex = norm.hex;
+    var selector = hex.slice(0, 8);
+    var body = hex.slice(8);
+    var fn = FUNCTIONS[selector] || null;
+
+    var words = [];
+    for (var i = 0; i < body.length; i += 64) words.push(body.slice(i, i + 64));
+
+    var result = {
+      ok: true, hex: hex, selector: selector, fn: fn, words: words, args: [],
+      byteLength: hex.length / 2, notes: []
+    };
+
+    if (!fn) {
+      result.verdict = 'unknown';
+      result.notes.push('선택자 ' + selector + ' 는 이 페이지가 아는 approve/transfer/transferFrom 이 아니에요. 읽지 못하면 도장을 찍지 않아요(규칙 8).');
+      return result;
+    }
+
+    var expectedWords = fn.args.length;
+    if (words.length < expectedWords || words[expectedWords - 1].length !== 64) {
+      result.verdict = 'malformed';
+      result.notes.push(fn.signature + ' 는 32바이트 조각 ' + expectedWords + '개가 필요한데 hex 가 짧아요 (' + result.byteLength + ' 바이트, 기대 ' + (4 + 32 * expectedWords) + ' 바이트). 복사가 잘렸을 수 있어요.');
+      return result;
+    }
+    if (words.length > expectedWords) {
+      result.notes.push('기대보다 긴 hex 예요 (' + result.byteLength + ' 바이트, 기대 ' + (4 + 32 * expectedWords) + ' 바이트). 뒤에 붙은 조각은 표준 ' + fn.name + ' 이 읽지 않는 부분이에요. 다른 함수이거나 복사가 섞였을 수 있어요.');
+    }
+
+    var verdict = 'ok';
+    fn.args.forEach(function (spec, idx) {
+      var word = words[idx];
+      var arg = { name: spec.name, type: spec.type, label: spec.label, word: word };
+      if (spec.type === 'address') {
+        arg.padding = word.slice(0, 24);
+        arg.hex40 = word.slice(24);
+        if (arg.padding !== '000000000000000000000000') {
+          arg.warning = '주소 칸의 앞 12바이트가 0이 아니에요. 표준 주소 인코딩이 아니므로 믿지 마세요.';
+          if (verdict === 'ok') verdict = 'malformed';
+        }
+        var views = addressViews(arg.hex40);
+        arg.evm = views.evm; arg.hex41 = views.hex41; arg.tron = views.tron; arg.knownLabel = views.label;
+        if (/^0{40}$/.test(arg.hex40)) arg.warning = '0x000…000 (빈 주소) 예요. 여기로 보내면 아무도 못 꺼내요.';
+      } else {
+        arg.raw = BigInt('0x' + word);
+        arg.rawString = arg.raw.toString();
+        arg.human = formatAmount(arg.raw, decimals);
+        arg.unlimited = unlimitedKind(arg.raw, decimals);
+        result.amount = arg;
+        if (arg.unlimited === 'max') verdict = 'unlimited';
+        else if (arg.unlimited === 'huge' && verdict === 'ok') verdict = 'huge';
+      }
+      result.args.push(arg);
+    });
+    result.verdict = verdict;
+    return result;
+  }
+
+  /** 토큰 컨트랙트 주소 판별: { state: 'empty'|'invalid'|'usdt'|'unknown', tron?, reason? } */
+  function classifyContract(text) {
+    var s = (text || '').trim();
+    if (!s) return { state: 'empty' };
+    var d = decodeBase58Check(s);
+    if (!d.ok) return { state: 'invalid', reason: d.reason };
+    if (s === NILE_USDT) return { state: 'usdt', tron: s, decimals: 6 };
+    return { state: 'unknown', tron: s };
+  }
+
+  return {
+    TRON_PREFIX: TRON_PREFIX,
+    MAX_UINT256: MAX_UINT256,
+    PRACTICALLY_UNLIMITED: PRACTICALLY_UNLIMITED,
+    FUNCTIONS: FUNCTIONS,
+    EXAMPLES: EXAMPLES,
+    KNOWN_ADDRESSES: KNOWN_ADDRESSES,
+    NILE_USDT: NILE_USDT,
+    encodeBase58Check: encodeBase58Check,
+    decodeBase58Check: decodeBase58Check,
+    addressViews: addressViews,
+    normalizeHex: normalizeHex,
+    formatAmount: formatAmount,
+    unlimitedKind: unlimitedKind,
+    decodeCalldata: decodeCalldata,
+    classifyContract: classifyContract
+  };
+});
+</script>
+<!-- core-end -->
+
+<script id="decoder-ui">
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  if (typeof window.ethers === 'undefined' || typeof window.ApproveDecoder === 'undefined') {
+    $('ethers-missing').classList.remove('hidden');
+    ['hex-input', 'btn-ex-approve', 'btn-ex-unlimited', 'btn-ex-transfer', 'btn-clear', 'decimals', 'contract-input'].forEach(function (id) { $(id).disabled = true; });
+    return;
+  }
+  var D = window.ApproveDecoder;
+
+  var input = $('hex-input');
+  var decimalsSel = $('decimals');
+  var contractInput = $('contract-input');
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function setVerdict(cls, html) {
+    var v = $('verdict');
+    v.className = 'verdict ' + cls;
+    v.innerHTML = html;
+  }
+
+  function addressCell(arg) {
+    var html = '<div>T주소: <span class="mono">' + escapeHtml(arg.tron) + '</span></div>' +
+      '<div>0x(EVM): <span class="mono">' + escapeHtml(arg.evm) + '</span></div>' +
+      '<div class="sub">41hex: <span class="mono">' + escapeHtml(arg.hex41) + '</span></div>';
+    if (arg.knownLabel) html += '<div class="sub">ℹ️ ' + escapeHtml(arg.knownLabel) + '</div>';
+    if (arg.warning) html += '<div>⚠️ ' + escapeHtml(arg.warning) + '</div>';
+    html += '<div class="sub"><a href="https://nile.tronscan.org/#/address/' + encodeURIComponent(arg.tron) + '" target="_blank" rel="noopener">Nile 탐색기에서 보기 (새 탭)</a></div>';
+    return html;
+  }
+
+  function amountCell(arg, decimals) {
+    var html = '<div class="amount-big">' + escapeHtml(arg.human) + ' (decimals ' + escapeHtml(decimals) + ')</div>' +
+      '<div class="sub">최소 단위 정수: <span class="mono">' + escapeHtml(arg.rawString) + '</span></div>';
+    if (arg.unlimited === 'max') html += '<div>❌ 정확히 2^256−1 = 무제한</div>';
+    else if (arg.unlimited === 'huge') html += '<div>⚠️ 천조(10^15) 개 이상 = 사실상 무제한</div>';
+    else html += '<div>✅ 유한한 금액</div>';
+    return html;
+  }
+
+  function render() {
+    var decimals = decimalsSel.value;
+    var text = input.value;
+    var table = $('result-table');
+    var body = $('result-body');
+    var wordsOl = $('words');
+    var hWords = $('h-words');
+
+    var r = D.decodeCalldata(text, decimals);
+
+    if (!r.ok) {
+      var msg = {
+        empty: '⏳ hex 를 넣으면 결과가 나와요.',
+        char: '❌ hex 가 아닌 글자가 있어요 (0~9, a~f 만 허용).',
+        odd: '❌ hex 글자 수가 홀수예요. 한 글자가 빠졌거나 더 붙었어요.',
+        short: '❌ 너무 짧아요. 선택자만 해도 4바이트(8글자)가 필요해요.'
+      }[r.reason];
+      setVerdict(r.reason === 'empty' ? 'idle' : 'bad', msg);
+      table.classList.add('hidden');
+      hWords.classList.add('hidden');
+      wordsOl.innerHTML = '';
+      return;
+    }
+
+    // 판정 배너
+    var fnName = r.fn ? r.fn.name : '알 수 없는 함수';
+    if (r.verdict === 'unknown') {
+      setVerdict('bad', '❌ 읽을 수 없는 허락증: 선택자 <span class="mono">' + escapeHtml(r.selector) + '</span> = ' + escapeHtml(fnName) + '<small>' + escapeHtml(r.notes.join(' ')) + '</small>');
+    } else if (r.verdict === 'malformed') {
+      setVerdict('bad', '❌ 모양이 이상한 ' + escapeHtml(fnName) + '<small>' + escapeHtml(r.notes.concat(r.args.filter(function (a) { return a.warning; }).map(function (a) { return a.warning; })).join(' ')) + '</small>');
+    } else if (r.verdict === 'unlimited') {
+      setVerdict('bad', '❌ 무제한 ' + escapeHtml(fnName) + ' (2^256−1): 이 spender 는 내 토큰 전부를 언제든 꺼내 갈 수 있어요.<small>규칙 9: 허락(approve)은 필요한 만큼만, 다 쓰면 0으로. 이런 팝업은 닫으세요.</small>');
+    } else if (r.verdict === 'huge') {
+      setVerdict('warn', '⚠️ 사실상 무제한 ' + escapeHtml(fnName) + ': ' + escapeHtml(r.amount.human) + ' 개는 어떤 지갑 잔고보다 커요.<small>정확히 2^256−1 은 아니지만 뜻은 같아요. decimals 를 잘못 골랐는지도 확인하세요.</small>');
+    } else {
+      var who = r.args[0];
+      var extra = r.notes.length ? '<small>⚠️ ' + escapeHtml(r.notes.join(' ')) + '</small>' : '';
+      setVerdict(r.notes.length ? 'warn' : 'ok', '✅ ' + escapeHtml(r.fn.signature) + ' — ' + escapeHtml(who.label) + ' <span class="mono">' + escapeHtml(who.tron) + '</span>, 금액 ' + escapeHtml(r.amount.human) + ' (decimals ' + escapeHtml(decimals) + ')<small>주소 앞 4글자·뒤 4글자만 보지 말고 전체를 상대와 맞추세요. 어떤 토큰인지는 contract_address 로 확인해요(규칙 3).</small>' + extra);
+    }
+
+    // 표
+    var rows = [];
+    rows.push('<tr><th scope="row">선택자 (앞 4바이트)</th><td><span class="mono">' + escapeHtml(r.selector) + '</span> → ' + escapeHtml(r.fn ? r.fn.signature : '알 수 없음') + '</td></tr>');
+    rows.push('<tr><th scope="row">전체 길이</th><td>' + r.byteLength + ' 바이트' + (r.fn ? ' (기대 ' + (4 + 32 * r.fn.args.length) + ' 바이트)' : '') + '</td></tr>');
+    r.args.forEach(function (arg) {
+      if (arg.type === 'address') rows.push('<tr><th scope="row">' + escapeHtml(arg.label) + '</th><td>' + addressCell(arg) + '</td></tr>');
+      else rows.push('<tr><th scope="row">' + escapeHtml(arg.label) + '</th><td>' + amountCell(arg, decimals) + '</td></tr>');
+    });
+    body.innerHTML = rows.join('');
+    table.classList.remove('hidden');
+
+    // 조각
+    var items = [];
+    items.push('<li class="sel"><span class="tag">선택자 4바이트</span><div class="mono">' + escapeHtml(r.selector) + '</div></li>');
+    r.words.forEach(function (w, i) {
+      var spec = r.fn && r.fn.args[i];
+      var cls = spec ? 'w' + (i + 1) : 'extra';
+      var tag = spec ? '조각 ' + (i + 1) + ' · ' + spec.label + (spec.type === 'address' ? ' (앞 12바이트 0 + 20바이트 주소)' : ' (uint256, 최소 단위)') : '조각 ' + (i + 1) + ' · ⚠️ 읽지 않는 부분';
+      var shown = spec && spec.type === 'address' && w.length === 64
+        ? '<span class="sub">' + escapeHtml(w.slice(0, 24)) + '</span><b>' + escapeHtml(w.slice(24)) + '</b>'
+        : escapeHtml(w);
+      items.push('<li class="' + cls + '"><span class="tag">' + escapeHtml(tag) + '</span><div class="mono">' + shown + (w.length !== 64 ? ' <b>(' + (w.length / 2) + '바이트, 잘림)</b>' : '') + '</div></li>');
+    });
+    wordsOl.innerHTML = items.join('');
+    hWords.classList.remove('hidden');
+  }
+
+  function renderContract() {
+    var c = D.classifyContract(contractInput.value);
+    var el = $('contract-verdict');
+    if (c.state === 'empty') { el.textContent = ''; return; }
+    if (c.state === 'invalid') {
+      el.textContent = '❌ T주소가 아니에요 (' + { empty: '비어 있음', char: 'base58 가 아닌 글자', length: '길이가 다름', checksum: '체크섬 불일치(오타)', prefix: '41 로 시작하지 않음' }[c.reason] + ').';
+      return;
+    }
+    if (c.state === 'usdt') {
+      el.textContent = '✅ Nile 테스트 USDT (TetherToken, symbol USDT, decimals 6) — decimals 를 6으로 맞췄어요.';
+      decimalsSel.value = '6';
+      render();
+      return;
+    }
+    el.textContent = '⚠️ 이 페이지가 모르는 컨트랙트예요. 같은 이름 USDT 라도 주소가 다르면 다른 토큰이에요(규칙 3). 탐색기 https://nile.tronscan.org/#/address/' + c.tron + ' 에서 확인하세요.';
+  }
+
+  function setExample(key) {
+    input.value = D.EXAMPLES[key];
+    render();
+    input.focus();
+  }
+
+  input.addEventListener('input', render);
+  decimalsSel.addEventListener('change', render);
+  contractInput.addEventListener('input', renderContract);
+  $('btn-ex-approve').addEventListener('click', function () { setExample('approve'); });
+  $('btn-ex-unlimited').addEventListener('click', function () { setExample('unlimited'); });
+  $('btn-ex-transfer').addEventListener('click', function () { setExample('transfer'); });
+  $('btn-clear').addEventListener('click', function () { input.value = ''; render(); input.focus(); });
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+$ MNEMONIC="abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" SEND_TX=false COUNTDOWN=0 node lessons/06-send-testnet/script.js   # 데모 니모닉, 2026-09-12 실행 (exit 0)
+
+Lesson 06 — 진짜로 보내기(연습 나라에서) · Nile 테스트넷
+  니모닉: 12단어 (abandon … about) ← 데모 니모닉(공개 값): 미리보기까지만 가능
+  보내는 사람: TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  받는 사람:   TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK
+  금액:        1 TRX (= 1000000 sun)
+  SEND_TX:     false (미리보기 모드, 기본값)
+  ⚠️  데모 주소(TUEZ…)는 owner/active 권한 키가 다른 키로 바뀌어 있어 개인키가 있어도 실제 전송이 거부됩니다.
+  ⚠️  guard 도 데모 니모닉 전송을 막습니다. 4단계 "미리보기 종료"까지만 진행합니다.
+
+[1] 내 계정 확인 — 활성화 · 잔고 · 무료 대역폭
+  활성화: 예 (create_time 2021-07-18T11:08:54.000Z)
+  TRX 잔고: 55167.40829 TRX (55167408290 sun)
+  무료 대역폭: 600 / 600 bytes 남음 (오늘 사용 0)
+  스테이킹 대역폭/에너지: NetLimit 11332, EnergyLimit 1323767
+  ✅ 보낼 수 있습니다 (잔고 55167.40829 TRX ≥ 필요 최대 2.266 TRX)
+  💬 getAccount 가 {} 이면 미활성화. getAccountResources 의 사용량 필드는 0 이면 생략되므로 ?? 0 처리.
+
+[2] 받는 사람 확인 — 활성화 여부
+  받는 주소: TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK
+  활성화: 예 (잔고 17523.7617 TRX)
+  ✅ 이미 활성화된 계정이라 활성화비가 들지 않습니다.
+  탐색기: https://nile.tronscan.org/#/address/TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK
+
+[3] 봉투 만들기 → 도장 찍기 → 미리보기 (레슨 5 요약)
+  ┌ 미리보기 ───────────────────────────────────────────────
+  │ 네트워크    Nile 테스트넷 (https://nile.trongrid.io)
+  │ 종류        TransferContract
+  │ 보내는 사람 TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  │ 받는 사람   TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK
+  │ 금액        1 TRX (1000000 sun)
+  │ 유효기간    60초 (expiration 2026-09-12T07:53:00.000Z)
+  │ 참조 블록   ref_block_bytes bbbd, ref_block_hash 2d5b094d581fd4a5
+  │ raw_data    133 bytes
+  │ txID        0fd977a93ee2f35369fd01eef1426257e43c21ba8eb2ad139e4f77c34bf4d45f
+  │ 서명        1개, 65 bytes
+  └────────────────────────────────────────────────────────
+  txID 변화: 서명 전후 같음 (txID 는 raw_data 의 sha256)
+  예상 수수료: 무료 대역폭이 있으면 0 TRX, 없으면 약 0.266 TRX (정확한 값은 receipt 의 net_usage/net_fee)
+  💬 sign 은 입력 객체를 제자리에서 수정한다. 브로드캐스트는 expiration 안에 해야 한다.
+
+[4] 관문 통과 확인 — assertCanSend
+  ⚠️  SEND_TX=false (기본값) 이므로 TRX 전송을(를) 보내지 않습니다. 실제로 보내려면 SEND_TX=true 를 앞에 붙이세요.
+
+🛑 미리보기 종료 — 아무것도 보내지 않았습니다. 장부에는 아무 흔적도 남지 않습니다.
+   실제로 보내려면(연습용 니모닉 + Nile 만): SEND_TX=true npm run l06
+  💬 GuardError 는 정상 흐름이다. exit 0 으로 끝난다.
+
+➡️ 다음: Lesson 07 영수증과 발자국 — txID 로 receipt 를 읽습니다.

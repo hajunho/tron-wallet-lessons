@@ -1,0 +1,8 @@
+node_modules/
+package-lock.json
+.env
+.probe/
+.DS_Store
+out/*
+!out/.gitkeep
+.last-tx.json

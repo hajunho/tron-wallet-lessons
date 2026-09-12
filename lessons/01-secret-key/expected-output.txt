@@ -1,0 +1,74 @@
+$ npm run l01   # 데모 니모닉, SEND_TX=false, 2026-09-12 실행 (exit 0)
+
+Lesson 01 · 12개 단어로 만든 비밀 열쇠 (네트워크 없이 실행)
+단어표: english (2048단어, 첫 단어 "abandon", 마지막 단어 "zoo")
+
+[1] 아무도 못 맞히는 무작위 만들기 (엔트로피 128비트)
+  방법: crypto.randomBytes(16) — 운영체제의 난수 생성기
+  엔트로피(hex): 290a…b5f4 (SHOW_SECRETS=true 로 전체 표시)
+  비트 수: 16바이트 × 8 = 128비트
+  가짓수: 2^128 = 340282366920938463463374607431768211456 ≈ 3.4×10^38 (39자리)
+  ✅ 이 숫자를 맞히는 것은 불가능에 가깝습니다. 그래서 "비밀"이 됩니다.
+  💬 엔트로피는 randomBytes 또는 물리 주사위에서 온다. 여기서 약하면 아래 모든 단계가 무의미하다.
+
+[2] 체크섬 4비트를 붙여 11비트씩 12조각 → 12단어(니모닉)
+  sha256(엔트로피) 앞 4비트 = 체크섬: 0001
+  전체 비트 수: 128 + 4 = 132비트 = 11비트 × 12
+  번호 | 11비트      | 인덱스 | 단어
+  -----+-------------+--------+------
+     1 | 00101001000 |  328   | cinnamon
+     2 | 01010100010 |  674   | february
+     3 | *********** | ****   | ****
+     4 | *********** | ****   | ****
+     5 | *********** | ****   | ****
+     6 | *********** | ****   | ****
+     7 | *********** | ****   | ****
+     8 | *********** | ****   | ****
+     9 | *********** | ****   | ****
+    10 | *********** | ****   | ****
+    11 | *********** | ****   | ****
+    12 | 11101000001 | 1857   | trial
+  ✅ 손으로 만든 12단어 == bip39.entropyToMnemonic(entropy, wordlist)
+  니모닉: cinnamon february … trial (12단어, SHOW_SECRETS=true 로 전체 표시)
+  💬 12단어는 엔트로피의 다른 표기일 뿐이다. 단어를 알면 엔트로피를 알고, 엔트로피를 알면 열쇠를 안다.
+
+[3] 검증(validateMnemonic): 단어를 바꾸거나 순서를 바꾸면?
+  원본 12단어: true
+  마지막 단어를 "tribe"(단어표 다음 단어)로 바꿈: false
+  1번째와 2번째 단어 순서를 바꿈: false
+  ✅ 검증은 "오타가 있다"는 것만 잡아 줍니다. "내 것이 맞다"는 것은 잡아 주지 못합니다.
+
+[4] 시드 64바이트 만들기 (PBKDF2 2048회) — PASSPHRASE 가 있으면 시드가 달라진다
+  PASSPHRASE: (없음, 빈 문자열)
+  시드(hex): d04a…9c94 (SHOW_SECRETS=true 로 전체 표시) — 64바이트
+  PASSPHRASE 를 "연습" 으로 바꾸면: e375…7b10 (SHOW_SECRETS=true 로 전체 표시)
+  두 시드가 같은가: false
+  ⚠️  같은 12단어라도 PASSPHRASE 가 한 글자만 달라도 완전히 다른 지갑이 됩니다. 적어 두지 않으면 아무도 못 찾습니다.
+  💬 mnemonicToSeedSync(mnemonic, passphrase). passphrase(12단어에서는 13번째 단어)는 검증되지 않으므로 오타도 "다른 지갑"이 된다.
+
+[5] 시드 → 경로 m/44'/195'/0'/0/0 → 열쇠 → T주소 (열쇠는 마스킹)
+  같은 엔트로피의 영어 니모닉: cinnamon february … trial (12단어, SHOW_SECRETS=true 로 전체 표시)
+    TronWeb.fromMnemonic (PASSPHRASE 없이): TGJJ6Cdid2t7gJurr6PvuMzk4TLwyv1Cyi
+    lib.walletFromMnemonic (ethers, PASSPHRASE 없이): TGJJ6Cdid2t7gJurr6PvuMzk4TLwyv1Cyi
+    bip32.fromSeed().derivePath (직접, PASSPHRASE 없이): TGJJ6Cdid2t7gJurr6PvuMzk4TLwyv1Cyi
+  ✅ 세 방법 모두 같은 T주소 (경로 m/44'/195'/0'/0/0, PASSPHRASE 없이 계산)
+  열쇠(개인키): bcaa…e3f9 (SHOW_SECRETS=true 로 전체 표시)
+  같은 엔트로피의 한국어 니모닉: 놀이 본질 … 평가 (12단어, SHOW_SECRETS=true 로 전체 표시)
+  ⚠️  TronWeb.fromMnemonic 은 한국어 단어표를 읽지 못합니다: invalid mnemonic word at index 0
+    bip32.fromSeed().derivePath (직접): TRALSuCALVvycFDNjA886wu2tvCsCtouS2
+  ✅ 한국어 12단어도 시드 → 경로 → 열쇠 → 주소 순서는 똑같습니다.
+  영어 12단어와 한국어 12단어의 주소가 같은가 (같은 PASSPHRASE 로 비교): false
+  ⚠️  같은 엔트로피라도 단어표(언어)가 다르면 시드가 달라져 다른 지갑이 됩니다. 복구할 때 언어까지 맞춰야 합니다.
+  이번에 만든 english 12단어의 T주소 (PASSPHRASE 적용): TGJJ6Cdid2t7gJurr6PvuMzk4TLwyv1Cyi
+  💬 경로가 같으면 tronweb, ethers, bip32 어느 라이브러리로 계산해도 같은 키가 나온다. 언어 단어표는 시드에 포함된다.
+
+[6] 데모 니모닉(abandon×11 about)은 엔트로피 0x00 에서 나온 공개 값
+  엔트로피 00×16 → 니모닉: abandon abandon … about (12단어, SHOW_SECRETS=true 로 전체 표시)
+  lib 의 DEMO_MNEMONIC 과 같은가: true
+  데모 주소: TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH (hex 41c8599111f29c1e1e061265b4af93ea1f274ad78a)
+  ⚠️  이 주소는 전 세계가 아는 니모닉의 주소입니다. Nile 에서 실제로 owner/active 권한 키가 41156f4463ce90ac11e1855ff99e4273806ad847cf 로 바뀌어 있어, 개인키가 있어도 전송할 수 없습니다.
+  ✅ 공개된(또는 새어 나간) 12단어의 지갑은 이미 남의 것입니다. 조회·연습에만 씁니다.
+  💬 데모 니모닉은 조회·시뮬레이션 전용. lib/guard.js 가 이 니모닉의 전송을 막는다.
+
+규칙 1. 열쇠(12단어)는 나만 안다. 고객센터도 모른다.
+➡️ 다음: Lesson 02 열쇠에서 우편함 번호가 나와요 (npm run l02)

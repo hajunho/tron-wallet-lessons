@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>서명 팝업 판별 놀이 — 도장 찍을까, 말까?</title>
+<meta name="description" content="지갑 앱의 서명 요청 팝업 5종을 보고 '서명/거절'을 고르는 놀이. 외부 요청 없음, 연습용 모의 화면.">
+<style>
+  /* 단일 파일, 외부 요청 없음. 색만으로 뜻을 나타내지 않고 글자·기호를 항상 함께 쓴다. */
+  :root {
+    --bg: #fbf9f4; --panel: #ffffff; --ink: #1f2430; --muted: #5b6270; --line: #d9d4c7;
+    --accent: #b3261e; --accent-bg: #fdecea;
+    --link: #0b57a4; --focus: #ff8c00;
+    --btn: #1f2430; --btn-ink: #ffffff;
+    --ok-bg: #e6f4ea; --ok-fg: #1e5e2b;
+    --bad-bg: #fdecec; --bad-fg: #8a1c1c;
+    --warn-bg: #fff4d6; --warn-fg: #6b4a00;
+    --mark-bg: #ffe08a; --mark-fg: #1f2430;
+    --popup-bar: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15171c; --panel: #1e2128; --ink: #ecebe6; --muted: #aab0bb; --line: #3a3f4a;
+      --accent: #ff8a80; --accent-bg: #3a1f1d;
+      --link: #8ab4f8; --focus: #ffb347;
+      --btn: #ecebe6; --btn-ink: #15171c;
+      --ok-bg: #173a22; --ok-fg: #b7e6c2;
+      --bad-bg: #4a1a1a; --bad-fg: #ffc1c1;
+      --warn-bg: #4a3a10; --warn-fg: #ffe4a1;
+      --mark-bg: #6b5400; --mark-fg: #fff3c4;
+      --popup-bar: #2a2e37;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15171c; --panel: #1e2128; --ink: #ecebe6; --muted: #aab0bb; --line: #3a3f4a;
+    --accent: #ff8a80; --accent-bg: #3a1f1d;
+    --link: #8ab4f8; --focus: #ffb347;
+    --btn: #ecebe6; --btn-ink: #15171c;
+    --ok-bg: #173a22; --ok-fg: #b7e6c2;
+    --bad-bg: #4a1a1a; --bad-fg: #ffc1c1;
+    --warn-bg: #4a3a10; --warn-fg: #ffe4a1;
+    --mark-bg: #6b5400; --mark-fg: #fff3c4;
+    --popup-bar: #2a2e37;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+    font-size: 16px; line-height: 1.55;
+  }
+  a { color: var(--link); }
+  a:focus-visible, button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .skip { position: absolute; left: -999px; top: 0; background: var(--panel); color: var(--ink); padding: 8px 12px; border: 2px solid var(--ink); }
+  .skip:focus { left: 8px; top: 8px; z-index: 10; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.45rem; margin: 8px 0 4px; }
+  h2 { font-size: 1.15rem; margin: 0 0 8px; }
+  p { margin: 6px 0; }
+  .sub { color: var(--muted); font-size: 0.95rem; }
+  .banner { border: 2px solid var(--accent); background: var(--accent-bg); color: var(--ink); border-radius: 10px; padding: 12px 14px; margin: 12px 0 16px; font-weight: 600; }
+  .banner strong { color: var(--accent); }
+  .banner small { display: block; font-weight: 400; margin-top: 4px; font-size: 0.92em; }
+  nav.lessons { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px; }
+  nav.lessons a { display: inline-block; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); text-decoration: none; font-size: 0.92rem; }
+  nav.lessons a:hover, nav.lessons a:focus-visible { border-color: var(--link); }
+  .howto { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 12px 0; }
+  .howto ol { margin: 4px 0 0; padding-left: 20px; }
+  kbd { font-family: inherit; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 0.9em; background: var(--panel); }
+
+  .status { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 14px 0 8px; font-weight: 600; }
+  .status .score { color: var(--muted); font-weight: 600; }
+
+  /* 지갑 팝업 모양 카드 */
+  .popup { background: var(--panel); border: 2px solid var(--line); border-radius: 14px; overflow: hidden; margin: 8px 0 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .popup .bar { background: var(--popup-bar); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; }
+  .popup .bar .mock { font-size: 0.8em; font-weight: 600; color: var(--muted); border: 1px dashed var(--muted); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+  .popup .body { padding: 14px; }
+  .popup .site { font-size: 0.92rem; color: var(--muted); margin-bottom: 8px; word-break: break-all; }
+  .popup .title { font-size: 1.05rem; font-weight: 700; margin: 0 0 8px; }
+  .popup table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+  .popup th, .popup td { text-align: left; vertical-align: top; padding: 6px 4px; border-top: 1px solid var(--line); }
+  .popup th { width: 32%; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .popup td { word-break: break-all; overflow-wrap: anywhere; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+  .popup pre { margin: 0; white-space: pre-wrap; word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .popup .field-input { border: 2px solid var(--line); border-radius: 8px; padding: 10px; color: var(--muted); background: var(--bg); font-style: italic; }
+  .popup .note { font-size: 0.88rem; color: var(--muted); margin-top: 8px; }
+  mark.look { background: var(--mark-bg); color: var(--mark-fg); font-weight: 700; padding: 0 3px; border-radius: 3px; text-decoration: underline; }
+  .looklabel { font-size: 0.8em; font-weight: 700; margin-left: 4px; white-space: nowrap; }
+
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+  @media (max-width: 420px) { .choices { grid-template-columns: 1fr; } }
+  .choices button { font: inherit; font-size: 1.05rem; font-weight: 700; padding: 14px 12px; border-radius: 12px; border: 2px solid var(--ink); background: var(--panel); color: var(--ink); cursor: pointer; }
+  .choices button:hover { background: var(--popup-bar); }
+  .choices button[disabled] { opacity: 0.55; cursor: not-allowed; }
+  .choices button.picked { box-shadow: 0 0 0 4px var(--focus) inset; }
+
+  .result { border-radius: 12px; padding: 12px 14px; margin: 10px 0; border: 2px solid var(--line); }
+  .result.ok { background: var(--ok-bg); color: var(--ok-fg); border-color: var(--ok-fg); }
+  .result.bad { background: var(--bad-bg); color: var(--bad-fg); border-color: var(--bad-fg); }
+  .result h3 { margin: 0 0 6px; font-size: 1.05rem; }
+  .result ul { margin: 6px 0 0; padding-left: 20px; }
+  .result .verdict { font-weight: 700; }
+  .result .fields { margin-top: 8px; background: var(--panel); color: var(--ink); border-radius: 8px; padding: 8px 10px; font-size: 0.95rem; }
+  .result .fields ul { margin: 4px 0 0; }
+  .result .rule { margin-top: 8px; font-weight: 700; }
+
+  .nav { display: flex; justify-content: flex-end; gap: 8px; margin: 8px 0 20px; }
+  .btn { font: inherit; font-size: 1rem; font-weight: 700; padding: 10px 16px; border-radius: 10px; border: 2px solid var(--btn); background: var(--btn); color: var(--btn-ink); cursor: pointer; }
+  .btn.secondary { background: var(--panel); color: var(--ink); border-color: var(--ink); }
+
+  .summary { background: var(--panel); border: 2px solid var(--line); border-radius: 14px; padding: 16px; margin: 8px 0 16px; }
+  .summary h2 { margin-top: 0; }
+  .summary .big { font-size: 1.6rem; font-weight: 800; margin: 4px 0 8px; }
+  .summary table { width: 100%; border-collapse: collapse; font-size: 0.95rem; margin: 8px 0; }
+  .summary th, .summary td { text-align: left; padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: top; }
+  .summary th { color: var(--muted); font-weight: 600; }
+  .summary .checklist { background: var(--warn-bg); color: var(--warn-fg); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+  .summary .checklist ul { margin: 4px 0 0; padding-left: 20px; }
+  .hidden { display: none !important; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  footer { color: var(--muted); font-size: 0.85rem; margin: 20px 0; border-top: 1px solid var(--line); padding-top: 12px; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<div class="wrap">
+
+  <header>
+    <h1>🖊️ 서명 팝업 판별 놀이</h1>
+    <p class="sub">지갑 앱 팝업처럼 생긴 카드 5장이 차례로 나와요. "도장(서명)을 찍을까, 거절할까?" 고르고, 어느 칸을 봐야 하는지 배워요. 이 페이지는 아무것도 서명하지 않고, 어디에도 보내지 않아요.</p>
+  </header>
+
+  <div class="banner" role="note" aria-label="안전 경고">
+    ⚠️ <strong>진짜 열쇠 입력 금지.</strong> 이 놀이의 팝업은 모두 <u>가짜(모의) 화면</u>이에요. 12단어(니모닉)나 열쇠(개인키)는 이 페이지를 포함해 어떤 웹페이지·팝업·채팅에도 절대 입력하지 마세요.
+    <small>규칙 1: 열쇠(12단어)는 나만 안다. 고객센터도 모른다. · 여기 나오는 주소는 연습 나라(Nile 테스트넷)의 공개 데모 주소예요.</small>
+  </div>
+
+  <nav class="lessons" aria-label="관련 레슨">
+    <a href="../lessons/08-sign-message/README.md">📘 Lesson 08 '나야'라고 증명하기(서명)</a>
+    <a href="../lessons/09-trc20-approve/README.md">📘 Lesson 09 사탕통 장부와 허락증(approve)</a>
+    <a href="../lessons/01-secret-key/README.md">📘 Lesson 01 12개 단어로 만든 비밀 열쇠</a>
+    <a href="index.html">🏠 놀이터 목록</a>
+  </nav>
+
+  <main id="main">
+    <section class="howto" aria-labelledby="howto-h">
+      <h2 id="howto-h">놀이 방법</h2>
+      <ol>
+        <li>팝업 카드를 <strong>끝까지</strong> 읽어요. 특히 "누구에게(spender), 얼마(value), 언제까지(deadline)" 칸을 찾아요.</li>
+        <li>[✅ 서명] 또는 [⛔ 거절] 버튼을 눌러요. 키보드는 <kbd>Tab</kbd>으로 옮기고 <kbd>Enter</kbd>로 눌러요. 숫자 <kbd>1</kbd>=서명, <kbd>2</kbd>=거절도 돼요.</li>
+        <li>해설을 읽고 [다음 카드]로 넘어가요. 5장이 끝나면 점수와 정리 카드가 나와요.</li>
+      </ol>
+    </section>
+
+    <div class="status" aria-live="polite">
+      <span id="progress">카드 1 / 5</span>
+      <span class="score" id="score">점수 0 / 5</span>
+    </div>
+
+    <div id="stage"></div>
+
+    <section id="summary" class="summary hidden" aria-labelledby="summary-h" tabindex="-1"></section>
+  </main>
+
+  <footer>
+    <p>이 페이지는 외부 라이브러리·폰트·이미지를 전혀 불러오지 않고, 입력값을 어디에도 보내지 않아요. 팝업 화면은 실제 지갑 앱과 다를 수 있어요(앱마다 화면 구성이 다름).</p>
+    <p>비유 → 정식 용어: 도장(서명) · 허락증(approve/allowance) · 우편함 번호(주소) · 열쇠(개인키) · 12단어 주문(니모닉) · 연습 나라(테스트넷 Nile)</p>
+  </footer>
+</div>
+
+<!-- core-start: 순수 로직. 브라우저에서는 window.SigningPopupSim, node 에서는 module.exports 로 노출 -->
+<script id="sim-core">
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) {
+    module.exports = factory();
+  } else {
+    root.SigningPopupSim = factory();
+  }
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // 검증된 공개 값 (tron-facts.md)
+  var MY_ADDRESS = 'TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH';        // 데모 니모닉 index 0
+  var MY_ADDRESS_HEX = '41c8599111f29c1e1e061265b4af93ea1f274ad78a';
+  var SERVICE_ADDRESS = 'TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK';   // 데모 니모닉 index 1 — 놀이에서 "내가 열어 둔 서비스"의 컨트랙트 역할
+  var STRANGER_HEX = '41156f4463ce90ac11e1855ff99e4273806ad847cf'; // 데모 지갑 권한을 가져간 낯선 열쇠 주소(실제 관찰값)
+  var STRANGER_ADDRESS = 'TBvYV4gvmB73zNhGdMW12bxxmPkpibcrRt';   // STRANGER_HEX 의 T주소 표기
+  var USDT_NILE = 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf';          // Nile 테스트 USDT (decimals 6)
+  var NILE_CHAIN_ID = 3448148188;
+  var UNLIMITED = '115792089237316195423570985008687907853269984665640564039457584007913129639935'; // 2^256 - 1
+  var SELECTOR_APPROVE = '095ea7b3';
+  var SELECTOR_TRANSFER = 'a9059cbb';
+  var FAR_FUTURE_DEADLINE = 4102444800; // 2100-01-01T00:00:00Z (unix 초)
+  var NOW_FOR_DEMO = 1789203600;        // 2026-09-12T09:00:00Z (놀이 기준 시각, 고정)
+
+  // 카드 2의 "읽을 수 없는 hex" = 실제로는 approve(낯선 주소, 무제한) 호출 데이터
+  var UNREADABLE_HEX = '0x' + SELECTOR_APPROVE
+    + '000000000000000000000000' + STRANGER_HEX.slice(2)
+    + 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+
+  /** 2^256-1 인지 (문자열 10진수 비교, BigInt 없이도 동작) */
+  function isUnlimited(valueStr) {
+    return String(valueStr).replace(/^0+/, '') === UNLIMITED;
+  }
+
+  /** 자릿수가 너무 큰 금액인지 (USDT 6자리 기준 1조 개 초과 = 19자리 이상) */
+  function isHuge(valueStr) {
+    return String(valueStr).replace(/^0+/, '').length >= 19;
+  }
+
+  /** deadline(unix 초)이 기준 시각보다 1년 넘게 뒤면 "먼 미래" */
+  function isFarFuture(deadlineSec, nowSec) {
+    return Number(deadlineSec) - Number(nowSec) > 365 * 24 * 60 * 60;
+  }
+
+  /** 10진 문자열 → 16진 문자열 (BigInt 없이, 초등 놀이터에서도 동작) */
+  function decToHex(decStr) {
+    var digits = String(decStr).split('').map(Number);
+    var hex = '';
+    while (digits.length && !(digits.length === 1 && digits[0] === 0)) {
+      var rem = 0;
+      var next = [];
+      for (var i = 0; i < digits.length; i += 1) {
+        var cur = rem * 10 + digits[i];
+        var q = Math.floor(cur / 16);
+        rem = cur % 16;
+        if (next.length || q) next.push(q);
+      }
+      hex = '0123456789abcdef'[rem] + hex;
+      digits = next.length ? next : [0];
+    }
+    return hex || '0';
+  }
+
+  /** 16진 문자열 → 10진 문자열 (BigInt 없이) */
+  function hexToDec(hexStr) {
+    var h = String(hexStr).replace(/^0x/, '').toLowerCase();
+    var digits = [0];
+    for (var i = 0; i < h.length; i += 1) {
+      var carry = parseInt(h[i], 16);
+      if (isNaN(carry)) return null;
+      for (var j = 0; j < digits.length; j += 1) {
+        var v = digits[j] * 16 + carry;
+        digits[j] = v % 10;
+        carry = Math.floor(v / 10);
+      }
+      while (carry) { digits.push(carry % 10); carry = Math.floor(carry / 10); }
+    }
+    return digits.reverse().join('');
+  }
+
+  /**
+   * 붙여넣은 hex 호출 데이터를 읽는다. approve/transfer 만 해석.
+   * 반환: { ok, selector, name, spenderHex41, valueDec, unlimited } 또는 { ok:false, reason }
+   */
+  function decodeCalldata(hex) {
+    var h = String(hex || '').replace(/^0x/, '').toLowerCase();
+    if (!/^[0-9a-f]*$/.test(h)) return { ok: false, reason: 'hex 가 아님' };
+    if (h.length !== 8 + 64 + 64) return { ok: false, reason: '길이가 approve/transfer 형식(4+32+32 바이트)이 아님' };
+    var selector = h.slice(0, 8);
+    var name = selector === SELECTOR_APPROVE ? 'approve' : selector === SELECTOR_TRANSFER ? 'transfer' : null;
+    if (!name) return { ok: false, reason: '모르는 선택자 ' + selector };
+    var word1 = h.slice(8, 72);
+    var word2 = h.slice(72, 136);
+    var spenderHex41 = '41' + word1.slice(24);
+    var valueDec = hexToDec(word2);
+    return { ok: true, selector: selector, name: name, spenderHex41: spenderHex41, valueDec: valueDec, unlimited: isUnlimited(valueDec) };
+  }
+
+  /** 6자리 소수 토큰 최소단위 → 사람이 읽는 수 (예: 3000000 → "3") */
+  function formatUnits6(valueStr) {
+    var s = String(valueStr).replace(/^0+/, '') || '0';
+    if (isUnlimited(s)) return '무제한(2^256−1)';
+    while (s.length < 7) s = '0' + s;
+    var whole = s.slice(0, -6);
+    var frac = s.slice(-6).replace(/0+$/, '');
+    return frac ? whole + '.' + frac : whole;
+  }
+
+  // 카드 5장. answer: 'sign' | 'reject'. kind 는 화면 그리기용.
+  var CARDS = [
+    {
+      id: 'login',
+      kind: 'message',
+      title: '메시지 서명 요청',
+      site: 'candy-swap.example (내가 방금 주소창에 직접 입력해 연 사이트)',
+      heading: '이 사이트에 로그인하려고 서명을 요청해요',
+      message: 'Sign in to candy-swap.example\n\nAddress: ' + MY_ADDRESS + '\nNonce: 8f3a21c4\nIssued at: 2026-09-12T09:00:00Z',
+      rows: [
+        { key: '보내는 돈', value: '없음 (수수료 0)' },
+        { key: '네트워크', value: '연습 나라 Nile (chainId ' + NILE_CHAIN_ID + ')' }
+      ],
+      answer: 'sign',
+      verdictLabel: '정상 — 읽고 나서 서명해도 돼요',
+      why: [
+        '메시지를 사람이 읽을 수 있어요. "candy-swap.example 에 로그인" 이라고 쓰여 있고, 그 사이트는 내가 직접 연 곳이에요.',
+        '내 우편함 번호(주소)와 한 번만 쓰는 번호(nonce), 날짜가 있어요. 이 도장은 "나야"라고 증명하는 데만 쓰여요.',
+        '"누구에게 얼마를 허락한다"는 칸(spender, value)이 아예 없어요. 돈이 나가는 봉투(트랜잭션)도 아니에요.'
+      ],
+      look: [
+        { field: '사이트 이름', hint: '주소창에 보이는 이름과 글자까지 같은지' },
+        { field: 'Address', hint: '내 주소(T…)가 맞는지' },
+        { field: 'Nonce · Issued at', hint: '한 번만 쓰는 번호와 날짜가 있는지 (오래 재사용 못 하게)' },
+        { field: '없어야 할 칸', hint: 'spender, value, approve 같은 말이 없어야 해요' }
+      ],
+      rule: '규칙 8: 무엇에 도장 찍는지 읽지 못하면 찍지 않는다. → 이번엔 읽을 수 있으니 괜찮아요.'
+    },
+    {
+      id: 'hex',
+      kind: 'hex',
+      title: '서명 요청',
+      site: 'free-airdrop-claim.example (채팅으로 받은 링크)',
+      heading: '에어드랍 확인용 무료 서명이에요. 수수료 0!',
+      hex: UNREADABLE_HEX,
+      rows: [
+        { key: '보내는 돈', value: '없음 (수수료 0)' }
+      ],
+      answer: 'reject',
+      verdictLabel: '거절 — 읽을 수 없는 종이에는 도장을 안 찍어요',
+      why: [
+        '긴 hex 숫자만 있고 사람이 읽을 수 있는 말이 없어요. 무엇에 도장 찍는지 모르면 찍지 않아요.',
+        '"무료·수수료 0"은 안전하다는 뜻이 아니에요. 도장 하나로 허락증이 넘어갈 수 있어요.',
+        '이 hex를 풀어 보면 사실은 허락증(approve)이었어요. 아래 "hex 풀어 보기"를 보세요.'
+      ],
+      look: [
+        { field: '읽을 수 있는 말', hint: '없어요 → 그 자체가 거절 이유예요' },
+        { field: '앞 8글자(선택자)', hint: SELECTOR_APPROVE + ' = approve(허락증). ' + SELECTOR_TRANSFER + ' 이면 transfer(보내기)' },
+        { field: '사이트', hint: '채팅으로 받은 링크는 내가 연 서비스가 아니에요' }
+      ],
+      rule: '규칙 8: 무엇에 도장 찍는지 읽지 못하면 찍지 않는다.'
+    },
+    {
+      id: 'permit',
+      kind: 'typed',
+      title: '구조화 서명 요청 (TIP-712)',
+      site: 'bonus-claim.example (광고 배너를 눌러서 열림)',
+      heading: '보너스를 받으려면 Permit 에 서명하세요 (수수료 0)',
+      domain: [
+        { key: 'name', value: 'Tether USD' },
+        { key: 'chainId', value: String(NILE_CHAIN_ID) },
+        { key: 'verifyingContract', value: USDT_NILE, note: '사탕통 장부(USDT 컨트랙트)' }
+      ],
+      fields: [
+        { key: 'owner', value: MY_ADDRESS, note: '나' },
+        { key: 'spender', value: STRANGER_ADDRESS, note: '처음 보는 주소', look: true },
+        { key: 'value', value: UNLIMITED, note: '2^256 − 1 = 무제한', look: true },
+        { key: 'deadline', value: String(FAR_FUTURE_DEADLINE), note: '2100-01-01 (약 73년 뒤)', look: true }
+      ],
+      answer: 'reject',
+      verdictLabel: '거절 — 낯선 사람에게 무제한, 영원히 허락하는 허락증이에요',
+      why: [
+        'Permit 은 "spender 가 value 만큼 deadline 까지 내 토큰을 꺼내 가도 됨" 허락증이에요. 수수료 0이지만 돈이 걸린 도장이에요.',
+        'spender 가 처음 보는 주소예요. 내가 열어 둔 서비스가 아니에요.',
+        'value 가 115792089237316195423570985008687907853269984665640564039457584007913129639935 = 2^256−1, 곧 무제한이에요. 지갑의 USDT 전부를 꺼내 갈 수 있어요.',
+        'deadline 이 2100년이에요. 사실상 영원히 유효해요.'
+      ],
+      look: [
+        { field: 'spender', hint: '누구에게? 내가 연 서비스 주소와 글자까지 같아야 해요' },
+        { field: 'value', hint: '얼마까지? 78자리 숫자(2^256−1)면 무제한이에요' },
+        { field: 'deadline', hint: '언제까지? 몇 분~몇 시간이면 정상, 몇 년 뒤면 의심' },
+        { field: 'verifyingContract · chainId', hint: '어느 사탕통 장부, 어느 나라인지' }
+      ],
+      rule: '규칙 9: 허락(approve)은 필요한 만큼만, 다 쓰면 0으로. (규칙 8도 함께)'
+    },
+    {
+      id: 'approve',
+      kind: 'tx',
+      title: '트랜잭션 확인 — 컨트랙트 호출',
+      site: 'candy-swap.example (내가 열어 둔 교환소, 3 USDT 를 바꾸려는 중)',
+      heading: 'candy-swap 이 내 USDT 를 3개까지 쓸 수 있게 허락(approve)해요',
+      fields: [
+        { key: '함수', value: 'approve(spender, amount)', note: '선택자 ' + SELECTOR_APPROVE },
+        { key: '토큰', value: USDT_NILE, note: 'Tether USD (USDT), decimals 6' },
+        { key: 'spender', value: SERVICE_ADDRESS, note: 'candy-swap 교환소 컨트랙트 (사이트 안내와 같은 주소)', look: true },
+        { key: 'amount', value: '3000000', note: '= 3 USDT (필요한 만큼)', look: true },
+        { key: 'feeLimit', value: '30 TRX (30,000,000 sun)', note: '에너지 소각 상한' },
+        { key: '네트워크', value: '연습 나라 Nile' }
+      ],
+      answer: 'sign',
+      verdictLabel: '조건부 정상 — 이 조건이 다 맞을 때만 서명해요',
+      why: [
+        '허락증(approve)은 서비스를 쓰려면 필요한 정상 절차예요. 다만 "누구에게, 얼마까지"가 맞아야 해요.',
+        'spender 가 내가 지금 열어 둔 candy-swap 의 컨트랙트 주소와 글자까지 같아요.',
+        'amount 가 3000000 = 3 USDT, 이번에 쓸 만큼이에요. 무제한이 아니에요.',
+        '조건: 금액이 필요한 만큼인지, spender 주소가 사이트 안내(또는 탐색기)와 같은지 확인한 뒤에만 서명해요. 다 쓰고 나면 같은 spender 에게 0을 다시 허락해요.'
+      ],
+      look: [
+        { field: 'spender', hint: '내가 연 서비스의 컨트랙트 주소인지 (앞뒤 4글자만 말고 전부)' },
+        { field: 'amount', hint: '3000000 = 3 USDT. 무제한(78자리)이면 거절' },
+        { field: 'feeLimit', hint: '이 도장은 봉투(트랜잭션)라서 TRX 수수료가 들어요 (Permit 과 다른 점)' }
+      ],
+      rule: '규칙 9: 허락(approve)은 필요한 만큼만, 다 쓰면 0으로.'
+    },
+    {
+      id: 'seed',
+      kind: 'seed',
+      title: '지갑 동기화',
+      site: 'wallet-sync-help.example ("고객센터"라며 보낸 링크)',
+      heading: '지갑 동기화를 위해 12단어를 입력하세요',
+      note: '동기화가 끝나면 잔고가 정상으로 표시됩니다. (모의 화면 — 아무것도 입력하지 마세요)',
+      answer: 'reject',
+      verdictLabel: '절대 거절 — 12단어를 묻는 곳은 전부 사기예요',
+      why: [
+        '12단어(니모닉)는 열쇠 그 자체예요. 서명 요청이 아니라 "열쇠를 통째로 주세요"예요.',
+        '어떤 지갑 앱, 고객센터, 노드 아저씨도 12단어를 묻지 않아요. "동기화·복구·검증·에어드랍"이라는 말이 붙어도 똑같아요.',
+        '12단어를 입력하면 그 지갑은 이미 남의 것이에요. 서명이나 승인처럼 나중에 취소할 수도 없어요.'
+      ],
+      look: [
+        { field: '12단어 입력칸', hint: '있으면 무조건 닫아요. 볼 것도 없어요' },
+        { field: '"고객센터"', hint: '고객센터도 12단어를 모르고, 묻지 않아요' }
+      ],
+      rule: '규칙 1: 열쇠(12단어)는 나만 안다. 고객센터도 모른다.'
+    }
+  ];
+
+  /** 선택을 채점한다. choice: 'sign' | 'reject' */
+  function judge(cardId, choice) {
+    var card = null;
+    for (var i = 0; i < CARDS.length; i += 1) if (CARDS[i].id === cardId) card = CARDS[i];
+    if (!card) return { ok: false, reason: '없는 카드' };
+    if (choice !== 'sign' && choice !== 'reject') return { ok: false, reason: '선택은 sign 또는 reject' };
+    return { ok: true, correct: choice === card.answer, answer: card.answer, card: card };
+  }
+
+  /** 점수 문구 */
+  function summarize(score, total) {
+    if (score === total) return '만점! 도장 찍기 전에 끝까지 읽는 습관이 생겼어요.';
+    if (score >= total - 1) return '거의 다 맞았어요. 틀린 카드의 "여기를 보세요"를 한 번 더 읽어요.';
+    if (score >= 3) return '절반 넘게 맞았어요. spender · value · deadline 세 칸을 소리 내어 읽는 연습을 해요.';
+    return '괜찮아요. 규칙 하나만 기억해요: 읽을 수 없으면 찍지 않는다.';
+  }
+
+  return {
+    CARDS: CARDS,
+    MY_ADDRESS: MY_ADDRESS, MY_ADDRESS_HEX: MY_ADDRESS_HEX, SERVICE_ADDRESS: SERVICE_ADDRESS,
+    STRANGER_HEX: STRANGER_HEX, STRANGER_ADDRESS: STRANGER_ADDRESS, USDT_NILE: USDT_NILE,
+    NILE_CHAIN_ID: NILE_CHAIN_ID, UNLIMITED: UNLIMITED, UNREADABLE_HEX: UNREADABLE_HEX,
+    FAR_FUTURE_DEADLINE: FAR_FUTURE_DEADLINE, NOW_FOR_DEMO: NOW_FOR_DEMO,
+    SELECTOR_APPROVE: SELECTOR_APPROVE, SELECTOR_TRANSFER: SELECTOR_TRANSFER,
+    isUnlimited: isUnlimited, isHuge: isHuge, isFarFuture: isFarFuture,
+    decToHex: decToHex, hexToDec: hexToDec, decodeCalldata: decodeCalldata, formatUnits6: formatUnits6,
+    judge: judge, summarize: summarize
+  };
+});
+</script>
+<!-- core-end -->
+
+<script id="sim-ui">
+(function () {
+  'use strict';
+  var S = window.SigningPopupSim;
+  var stage = document.getElementById('stage');
+  var summaryEl = document.getElementById('summary');
+  var progressEl = document.getElementById('progress');
+  var scoreEl = document.getElementById('score');
+  var index = 0;
+  var score = 0;
+  var answered = false;
+  var results = [];
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function h(tag, attrs, html) {
+    var el = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+    if (html != null) el.innerHTML = html;
+    return el;
+  }
+
+  function rowHtml(key, value, note, look, mono) {
+    var v = mono ? '<span class="mono">' + esc(value) + '</span>' : esc(value);
+    if (look) v = '<mark class="look">' + v + '</mark><span class="looklabel">◀ 👀 여기</span>';
+    return '<tr><th scope="row">' + esc(key) + '</th><td>' + v + (note ? '<div class="note">' + esc(note) + '</div>' : '') + '</td></tr>';
+  }
+
+  function renderPopupBody(card) {
+    var html = '<div class="site">🌐 사이트: ' + esc(card.site) + '</div>';
+    html += '<p class="title">' + esc(card.heading) + '</p>';
+    if (card.kind === 'message') {
+      html += '<pre aria-label="서명할 메시지">' + esc(card.message) + '</pre>';
+      html += '<table>' + card.rows.map(function (r) { return rowHtml(r.key, r.value); }).join('') + '</table>';
+    } else if (card.kind === 'hex') {
+      html += '<pre aria-label="서명할 데이터(hex)">' + esc(card.hex) + '</pre>';
+      html += '<table>' + card.rows.map(function (r) { return rowHtml(r.key, r.value); }).join('') + '</table>';
+    } else if (card.kind === 'typed') {
+      html += '<table><caption class="sr-only">도메인</caption>' + card.domain.map(function (r) { return rowHtml(r.key, r.value, r.note, false, true); }).join('') + '</table>';
+      html += '<p class="note"><strong>Permit</strong> (owner, spender, value, deadline)</p>';
+      html += '<table>' + card.fields.map(function (r) { return rowHtml(r.key, r.value, r.note, false, true); }).join('') + '</table>';
+    } else if (card.kind === 'tx') {
+      html += '<table>' + card.fields.map(function (r) { return rowHtml(r.key, r.value, r.note, false, r.key === 'spender' || r.key === '토큰' || r.key === 'amount'); }).join('') + '</table>';
+    } else if (card.kind === 'seed') {
+      html += '<div class="field-input" aria-hidden="true">단어 1  단어 2  단어 3 … 단어 12 (입력칸 흉내 — 진짜 입력칸이 아니에요)</div>';
+      html += '<p class="note">' + esc(card.note) + '</p>';
+    }
+    return html;
+  }
+
+  /** 해설에서 "여기를 보세요" 칸을 팝업 안에 표시 (정답 공개 후) */
+  function highlightFields(card) {
+    var popup = stage.querySelector('.popup');
+    if (!popup) return;
+    var ths = popup.querySelectorAll('th');
+    var lookKeys = (card.fields || []).filter(function (f) { return f.look; }).map(function (f) { return f.key; });
+    ths.forEach(function (th) {
+      if (lookKeys.indexOf(th.textContent) >= 0) {
+        var td = th.nextElementSibling;
+        var span = td.querySelector('.mono') || td.firstChild;
+        var mark = document.createElement('mark');
+        mark.className = 'look';
+        td.insertBefore(mark, span);
+        mark.appendChild(span);
+        var lbl = h('span', { 'class': 'looklabel' }, '◀ 👀 여기');
+        td.insertBefore(lbl, mark.nextSibling);
+      }
+    });
+    if (card.kind === 'hex') {
+      var pre = popup.querySelector('pre');
+      var text = pre.textContent;
+      pre.innerHTML = '<mark class="look">' + esc(text.slice(0, 10)) + '</mark>' + esc(text.slice(10, 74)) + '<mark class="look">' + esc(text.slice(74)) + '</mark>';
+    }
+    if (card.kind === 'message') {
+      var pre2 = popup.querySelector('pre');
+      pre2.innerHTML = esc(pre2.textContent).replace(/(Sign in to [^\n]+)/, '<mark class="look">$1</mark>').replace(/(Nonce: [^\n]+)/, '<mark class="look">$1</mark>');
+    }
+  }
+
+  function renderCard(card) {
+    stage.innerHTML = '';
+    var popup = h('section', { 'class': 'popup', 'aria-labelledby': 'popup-h-' + card.id });
+    popup.innerHTML =
+      '<div class="bar"><span id="popup-h-' + card.id + '">🔐 ' + esc(card.title) + '</span><span class="mock">모의 화면 · 가짜</span></div>' +
+      '<div class="body">' + renderPopupBody(card) + '</div>';
+    stage.appendChild(popup);
+
+    var choices = h('div', { 'class': 'choices', role: 'group', 'aria-label': '선택' });
+    var signBtn = h('button', { type: 'button', 'data-choice': 'sign' }, '✅ 서명 (도장 찍기)');
+    var rejectBtn = h('button', { type: 'button', 'data-choice': 'reject' }, '⛔ 거절 (닫기)');
+    choices.appendChild(signBtn);
+    choices.appendChild(rejectBtn);
+    stage.appendChild(choices);
+
+    var resultBox = h('div', { id: 'result', tabindex: '-1', 'aria-live': 'polite' });
+    stage.appendChild(resultBox);
+
+    function pick(choice) {
+      if (answered) return;
+      answered = true;
+      var r = S.judge(card.id, choice);
+      if (r.correct) score += 1;
+      results.push({ card: card, choice: choice, correct: r.correct });
+      signBtn.disabled = true; rejectBtn.disabled = true;
+      (choice === 'sign' ? signBtn : rejectBtn).classList.add('picked');
+      scoreEl.textContent = '점수 ' + score + ' / ' + S.CARDS.length;
+      highlightFields(card);
+      renderResult(card, choice, r.correct, resultBox);
+      resultBox.focus();
+    }
+    signBtn.addEventListener('click', function () { pick('sign'); });
+    rejectBtn.addEventListener('click', function () { pick('reject'); });
+    stage._pick = pick;
+    signBtn.focus();
+  }
+
+  function choiceLabel(c) { return c === 'sign' ? '✅ 서명' : '⛔ 거절'; }
+
+  function renderResult(card, choice, correct, box) {
+    var html = '';
+    html += '<div class="result ' + (correct ? 'ok' : 'bad') + '" role="status">';
+    html += '<h3>' + (correct ? '✔ 정답!' : '✘ 아쉬워요') + ' <span class="verdict">— 정답은 ' + choiceLabel(card.answer) + '</span></h3>';
+    html += '<p><strong>' + esc(card.verdictLabel) + '</strong></p>';
+    html += '<ul>' + card.why.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>';
+    html += '<div class="fields"><strong>👀 어느 칸을 봐야 하나요?</strong><ul>' + card.look.map(function (l) { return '<li><strong>' + esc(l.field) + '</strong> — ' + esc(l.hint) + '</li>'; }).join('') + '</ul></div>';
+    if (card.kind === 'hex') {
+      var d = S.decodeCalldata(card.hex);
+      if (d.ok) {
+        html += '<div class="fields"><strong>🔍 hex 풀어 보기 (거절한 뒤에 궁금하면)</strong><ul>' +
+          '<li>앞 8글자 <span class="mono">' + esc(d.selector) + '</span> = <strong>' + esc(d.name) + '</strong> (허락증)</li>' +
+          '<li>spender = <span class="mono">' + esc(d.spenderHex41) + '</span> → T주소 <span class="mono">' + esc(S.STRANGER_ADDRESS) + '</span> (처음 보는 주소)</li>' +
+          '<li>value = <span class="mono">' + esc(d.valueDec) + '</span> → ' + (d.unlimited ? '<strong>무제한(2^256−1)</strong>' : esc(S.formatUnits6(d.valueDec)) + ' USDT') + '</li>' +
+          '<li>읽을 수 있어도 결론은 같아요: 낯선 주소에 무제한 허락 → 거절.</li></ul></div>';
+      }
+    }
+    if (card.kind === 'typed') {
+      html += '<div class="fields"><strong>🔢 숫자로 확인</strong><ul>' +
+        '<li>value 자릿수: ' + S.UNLIMITED.length + '자리 → 2^256−1 = 무제한 ' + (S.isUnlimited(S.UNLIMITED) ? '(확인됨 ✔)' : '') + '</li>' +
+        '<li>deadline ' + S.FAR_FUTURE_DEADLINE + ' − 지금(2026-09-12) = 약 ' + Math.floor((S.FAR_FUTURE_DEADLINE - S.NOW_FOR_DEMO) / (365.25 * 86400)) + '년 뒤 → 먼 미래 ' + (S.isFarFuture(S.FAR_FUTURE_DEADLINE, S.NOW_FOR_DEMO) ? '(확인됨 ✔)' : '') + '</li>' +
+        '<li>TIP-712 는 EIP-712 와 같은 구조예요. 지갑이 표로 보여 주니 읽을 수 있고, 읽을 수 있으면 읽어야 해요.</li></ul></div>';
+    }
+    if (card.kind === 'tx') {
+      html += '<div class="fields"><strong>🔢 숫자로 확인</strong><ul>' +
+        '<li>amount 3000000 ÷ 1,000,000 (decimals 6) = ' + esc(S.formatUnits6('3000000')) + ' USDT</li>' +
+        '<li>무제한이었다면 ' + S.UNLIMITED.length + '자리 숫자가 보여요. 그때는 금액을 이번에 쓸 만큼으로 고치거나 거절해요.</li>' +
+        '<li>다 쓴 뒤: 같은 spender 에게 approve(0) → allowance 0 확인 (Lesson 09).</li></ul></div>';
+    }
+    html += '<p class="rule">🛡️ ' + esc(card.rule) + '</p>';
+    html += '</div>';
+    box.innerHTML = html;
+
+    var nav = h('div', { 'class': 'nav' });
+    var last = index === S.CARDS.length - 1;
+    var next = h('button', { type: 'button', 'class': 'btn' }, last ? '결과 보기 ▶' : '다음 카드 ▶');
+    next.addEventListener('click', function () {
+      if (last) renderSummary(); else { index += 1; answered = false; start(); }
+    });
+    nav.appendChild(next);
+    box.appendChild(nav);
+  }
+
+  function renderSummary() {
+    stage.innerHTML = '';
+    progressEl.textContent = '끝 (5 / 5)';
+    var total = S.CARDS.length;
+    var html = '<h2 id="summary-h">🏁 정리 카드</h2>';
+    html += '<p class="big">점수 ' + score + ' / ' + total + '</p>';
+    html += '<p>' + esc(S.summarize(score, total)) + '</p>';
+    html += '<table><thead><tr><th scope="col">카드</th><th scope="col">내 선택</th><th scope="col">정답</th><th scope="col">결과</th></tr></thead><tbody>';
+    results.forEach(function (r, i) {
+      html += '<tr><td>' + (i + 1) + '. ' + esc(r.card.title) + '</td><td>' + choiceLabel(r.choice) + '</td><td>' + choiceLabel(r.card.answer) + '</td><td>' + (r.correct ? '✔ 정답' : '✘ 오답') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div class="checklist"><strong>📝 도장 찍기 전 3초 점검</strong><ul>' +
+      '<li>읽을 수 있나요? 긴 hex 만 있으면 → 거절 (규칙 8)</li>' +
+      '<li><strong>spender</strong>(누구에게) · <strong>value/amount</strong>(얼마) · <strong>deadline</strong>(언제까지) 세 칸을 소리 내어 읽어요</li>' +
+      '<li>78자리 숫자(2^256−1)는 무제한이에요 → 이번에 쓸 만큼으로 고치거나 거절 (규칙 9)</li>' +
+      '<li>다 쓰면 같은 spender 에게 0을 허락해 허락증을 지워요</li>' +
+      '<li>12단어를 묻는 화면은 무조건 닫아요. 고객센터도 묻지 않아요 (규칙 1)</li></ul></div>';
+    html += '<p class="sub">더 배우기: <a href="../lessons/08-sign-message/README.md">Lesson 08 서명</a> · <a href="../lessons/09-trc20-approve/README.md">Lesson 09 approve</a> · <a href="../lessons/01-secret-key/README.md">Lesson 01 12단어</a></p>';
+    summaryEl.innerHTML = html;
+    var again = h('button', { type: 'button', 'class': 'btn secondary' }, '↻ 다시 하기');
+    again.addEventListener('click', function () {
+      index = 0; score = 0; answered = false; results = [];
+      scoreEl.textContent = '점수 0 / ' + total;
+      summaryEl.classList.add('hidden');
+      start();
+    });
+    summaryEl.appendChild(again);
+    summaryEl.classList.remove('hidden');
+    summaryEl.focus();
+  }
+
+  function start() {
+    var card = S.CARDS[index];
+    progressEl.textContent = '카드 ' + (index + 1) + ' / ' + S.CARDS.length;
+    renderCard(card);
+  }
+
+  // 숫자 키 1 = 서명, 2 = 거절 (입력칸이 없으니 전역으로)
+  document.addEventListener('keydown', function (e) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (!stage._pick || answered) return;
+    if (e.key === '1') { e.preventDefault(); stage._pick('sign'); }
+    if (e.key === '2') { e.preventDefault(); stage._pick('reject'); }
+  });
+
+  start();
+})();
+</script>
+</body>
+</html>

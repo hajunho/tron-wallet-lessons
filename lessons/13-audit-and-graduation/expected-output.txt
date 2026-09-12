@@ -1,0 +1,111 @@
+$ npm run l13   # 데모 니모닉, SEND_TX=false, 2026-09-12 실행 (exit 0)
+
+Lesson 13 — 내 지갑 점검과 졸업
+네트워크: Nile 테스트넷 (https://nile.trongrid.io) — 읽기만 합니다. 서명·전송 없음.
+ℹ️  데모 모드: MNEMONIC/ADDRESS 가 없어(또는 데모 니모닉이라) 공개 데모 주소를 점검합니다.
+  점검 주소: TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH (데모 니모닉 (index 0))
+  hex 주소: 41c8599111f29c1e1e061265b4af93ea1f274ad78a
+  탐색기: https://nile.tronscan.org/#/address/TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  점검 날짜: 2026. 9. 13. 오전 12:24:54
+
+[1] 기본 정보 — 잔고, 활성화, 만든 날
+  TRX 잔고: 55167.40859 TRX (55,167,408,590 sun)
+  ✅ TRX 가 있습니다. 연료(대역폭·에너지가 모자랄 때 소각할 TRX)가 준비되어 있습니다.
+  ✅ 활성화된 계정입니다 (장부에 이 주소의 장이 있습니다).
+  계정 생성 시각: 2021. 7. 18. 오후 8:08:54 (create_time 1626606534000)
+
+[2] 계정 권한 — 이 상자의 열쇠 구멍 주인은 나인가?
+  owner threshold / 키 수: 1 / 1
+  owner 키 #1: 41156f4463ce90ac11e1855ff99e4273806ad847cf (weight 1)
+  내 hex 주소: 41c8599111f29c1e1e061265b4af93ea1f274ad78a
+  ⚠️  다른 키가 권한을 가짐! owner 키 1개 중 내 주소가 없습니다.
+  active #1 (active) threshold / 키 수: 1 / 1
+    active #1 키 #1: 41156f4463ce90ac11e1855ff99e4273806ad847cf (weight 1)
+  ⚠️  active 권한에 다른 키가 있습니다. 권한 키가 내 것이 아니므로 원래 열쇠로는 전송이 거부될 것입니다(실제 브로드캐스트는 확인하지 않았습니다).
+  무슨 일?: 누군가 updateAccountPermissions 로 owner/active 권한 키를 자기 키로 바꿔 두었습니다.
+  왜?: 데모 니모닉은 전 세계에 공개된 값입니다. 공개된 니모닉의 주소는 이미 남의 것입니다.
+  그러면?: 조회·시뮬레이션은 되지만 원래 열쇠로는 아무것도 못 보냅니다. 이 주소는 버리고 새 지갑으로 옮기는 것이 순서입니다.
+  💬 owner_permission.keys[0].address === 내 hex 가 정상. active_permission 은 배열이라 모든 항목의 키를 검사합니다.
+
+[3] 자원과 스테이킹 — 입장권은 남아 있나, 맡긴 TRX 는 얼마인가
+  무료 대역폭: 600 / 600 남음 (freeNetUsed 0)
+  스테이킹 대역폭: 11332 / 11332 남음
+  에너지: 1323765 / 1323765 남음
+  ✅ 대역폭이 남아 있습니다. 단순 전송은 TRX 소각 없이 가능합니다.
+  맡긴 TRX (frozenV2): type 없음(대역폭 추정)=17949 TRX, ENERGY=17950 TRX
+  참고: type 이 없는 항목을 대역폭으로 보는 것은 관례입니다(확인 필요).
+  돌려받는 중 (unfrozenV2): 없음
+  언스테이킹 가능 횟수: 32회 (getAvailableUnfreezeCount)
+
+[4] 토큰과 허락증 — USDT 잔고, 누구에게 얼마까지 허락했나
+  USDT 컨트랙트: TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf (토큰은 이름이 아니라 이 주소로 알아봅니다)
+  USDT 잔고: 19589.654444 USDT (최소 단위 19,589,654,444)
+  허락증 확인 상대: 1명 — 같은 니모닉의 index 1 (SPENDERS 로 바꿀 수 있음)
+  ✅ TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK 에게 남은 허락 0. 깨끗합니다.
+  💬 UNLIMITED/2 이상이면 무제한으로 봅니다(lib/guard 와 같은 기준). 무제한이면 approve(0) 트랜잭션이 필요합니다(Lesson 09).
+
+[5] 최근 거래 — 내가 보낸 봉투는 몇 건인가, 실패한 봉투가 있나
+  최근 트랜잭션: 5건 (https://nile.trongrid.io/v1/accounts/TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH/transactions?limit=5&only_confirmed=true)
+  시각 | 종류 | 결과 | 상대 | 금액 | 수수료
+  2026. 9. 12. 오후 6:22:09 | TransferContract | SUCCESS | ← TBdYXt…anu1 | 0.0001 TRX | 0.265 TRX
+  2026. 9. 12. 오후 6:17:30 | TransferContract | SUCCESS | ← TBdYXt…anu1 | 0.0001 TRX | 0 TRX
+  2026. 9. 12. 오후 6:16:45 | TransferContract | SUCCESS | ← TBdYXt…anu1 | 0.0001 TRX | 0 TRX
+  2026. 9. 12. 오후 5:46:54 | UnDelegateResourceContract | SUCCESS | ← TMDap8…6BUu | 271.249821 TRX (ENERGY) | 0.281 TRX
+  2026. 9. 12. 오후 5:45:45 | DelegateResourceContract | SUCCESS | ← TMDap8…6BUu | 271.249821 TRX (ENERGY) | 0.279 TRX
+  방향별: 내가 보낸 것(→) 0건 / 남이 나에게 한 것(←) 5건
+  가장 최근 txID: 9a81c390c9e3eb13eecc223cb381f7d66e0585cbc7588dad802f0adf25c750fd → https://nile.tronscan.org/#/transaction/9a81c390c9e3eb13eecc223cb381f7d66e0585cbc7588dad802f0adf25c750fd
+  ✅ 최근 5건 모두 SUCCESS.
+  ✅ 최근 목록에 내가 보낸(→) 거래가 없습니다. 직접 확인할 것이 없습니다.
+  최근 TRC-20 이동: 5건 (https://nile.trongrid.io/v1/accounts/TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH/transactions/trc20?limit=5)
+  시각 | 토큰(컨트랙트) | 방향 | 상대 | 금액
+  2026. 9. 12. 오후 8:28:00 | USDT (TXYZop…AeBf) | 받음 ← | TNP759…LuhX | 1.5 USDT
+  2026. 9. 12. 오전 8:55:51 | USDT (TXYZop…AeBf) | 받음 ← | TVJNmi…JC8Q | 1.5 USDT
+  2026. 9. 11. 오전 11:41:30 | USDT (TXYZop…AeBf) | 받음 ← | TTsXdX…bHbj | 2000 USDT
+  2026. 9. 7. 오후 10:16:57 | USDT (TXYZop…AeBf) | 받음 ← | TFpe6P…QKw9 | 100 USDT
+  2026. 9. 3. 오후 6:32:30 | USDT (TXYZop…AeBf) | 받음 ← | TQfMRc…fcds | 10 USDT
+  ✅ 최근 TRC-20 이동은 모두 Nile USDT 컨트랙트입니다.
+  💬 TronGrid v1 REST: /v1/accounts/{addr}/transactions 와 /transactions/trc20. 수수료는 ret[0].fee(sun) = net_fee + energy_fee.
+
+[6] 점검 결과 요약, 사고 대응 순서, 졸업 체크리스트
+  점검 항목: 9개 — ✅ 7개 / ⚠️ 2개 / ❓ 0개(직접 확인·조회 실패)
+  ✅ TRX 잔고
+  ✅ 계정 활성화
+  ⚠️  owner 권한
+  ⚠️  active 권한
+  ✅ 대역폭
+  ✅ allowance TSeJkU…NQZK
+  ✅ 최근 거래 결과
+  ✅ 내가 보낸 거래 확인
+  ✅ 토큰 컨트랙트
+  ⚠️  경고가 2개입니다. 아래 순서를 읽고, 혼자 끙끙대지 말고 어른(또는 동료)과 함께 움직이세요.
+  데모 주소라면: ⚠️ 는 예상된 결과입니다. 공개된 니모닉의 주소는 이미 남의 것이라는 실제 증거입니다.
+
+  사고 대응 순서 (열쇠가 샜거나, 모르는 거래·권한이 보일 때)
+  1. 멈추기: 그 지갑으로 더 이상 서명하지 않고, "고쳐 준다"는 사람의 말을 듣지 않는다(규칙 12).
+  2. 새 지갑 만들기: 새 12단어를 만들고(npm run new-wallet) 종이에 적는다. 새 주소를 탐색기에서 확인한다.
+  3. 자산 옮기기: TRX(연료)를 먼저 조금 보내 새 주소를 활성화하고, 남은 TRX·USDT 를 새 주소로 보낸다. 소액 먼저(규칙 6).
+  4. 허락 취소: 옛 지갑에서 approve(0) 을 보낼 수 있으면 보내고, 권한이 이미 바뀌었다면 옛 지갑은 버린다(규칙 9).
+  5. 알리기·신고: 가족이나 동료에게 알리고, 거래소·서비스에 연락하고, 필요하면 수사기관에 신고한다(신고처는 나라마다 다름, 확인 필요).
+
+  졸업 체크리스트 — 13대 안전 규칙 (읽고 ☐ 에 표시하세요)
+  ☐ 규칙  1. 열쇠(12단어)는 나만 안다. 고객센터도 모른다.
+  ☐ 규칙  2. 주소는 모두에게, 열쇠는 아무에게도.
+  ☐ 규칙  3. 잔고는 앱이 아니라 장부(탐색기)에서 확인하고, 토큰은 이름이 아니라 컨트랙트 주소로 알아본다.
+  ☐ 규칙  4. USDT만 있고 TRX가 0이면 아무것도 못 보낸다. 연료(입장권)가 먼저다.
+  ☐ 규칙  5. 도장을 찍기 전에 봉투(트랜잭션 내용)를 끝까지 읽는다.
+  ☐ 규칙  6. 보내면 되돌릴 수 없다. 처음 보내는 곳은 소액 먼저.
+  ☐ 규칙  7. "보냈다"는 말 대신 txID로 영수증을 본다.
+  ☐ 규칙  8. 무엇에 도장 찍는지 읽지 못하면 찍지 않는다.
+  ☐ 규칙  9. 허락(approve)은 필요한 만큼만, 다 쓰면 0으로.
+  ☐ 규칙 10. 앱이 "실패할 것 같다"고 하면 보내지 않는다.
+  ☐ 규칙 11. 보내기 전에 나라(네트워크)를 상대와 글자까지 맞춘다.
+  ☐ 규칙 12. 실패는 단서다. "고쳐 준다"는 사람은 사기다.
+  ☐ 규칙 13. 한 달에 한 번 점검, 사고가 나면 순서대로, 혼자 끙끙대지 않기.
+  💬 npm run audit 을 매달 cron 처럼 돌리고, ⚠️ 가 0 이 아니면 알림을 보내도록 확장해 보세요(도전 과제).
+
+요약
+  주소 TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  ✅ 7 / ⚠️ 2 / ❓ 0 (항목 9개)
+  규칙 13: 한 달에 한 번 점검, 사고가 나면 순서대로, 혼자 끙끙대지 않기.
+
+🎓 졸업을 축하합니다. ➡️ 다음: 한 달 뒤 npm run audit 으로 다시 점검 (Lesson 01 부터 복습해도 좋아요)

@@ -1,0 +1,70 @@
+$ npm run l09   # 데모 니모닉, SEND_TX=false, 2026-09-12 실행 (exit 0)
+
+Lesson 09 — 사탕통 장부와 허락증(TRC-20): 허락(approve)은 필요한 만큼만, 다 쓰면 0으로
+네트워크: Nile 테스트넷 (https://nile.trongrid.io) — 기본은 읽기·리허설·빌드까지. 전송은 SEND_TX=true 일 때만.
+
+[1] 사탕통 장부 읽기 — balanceOf 와 allowance(owner, spender)
+  ⚠️  MNEMONIC 이 없거나 데모 니모닉입니다 → 데모 모드. 조회·리허설·빌드는 되지만 전송은 guard 가 막습니다.
+  니모닉: abandon abandon … about (12단어, SHOW_SECRETS=true 로 전체 표시)
+  owner (나, 사탕통 주인): TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  spender (허락받는 쪽): TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK (같은 니모닉의 index 1 (m/44'/195'/0'/0/1))
+  사탕통(USDT 컨트랙트): TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf
+  symbol / decimals: USDT / 6
+  balanceOf(owner): 19589.654444 USDT (최소 단위 19589654444)
+  allowance(owner, spender): 0 USDT (허락 없음)
+  이번에 허락하려는 금액: 3 USDT = 최소 단위 3000000
+  ✅ allowance 는 "spender 가 owner 의 사탕통에서 앞으로 꺼내 갈 수 있는 상한"입니다. 잔고와는 다른 칸입니다.
+  💬 TRC-20 = ERC-20 ABI. allowance(owner, spender) → uint256. 잔고보다 큰 allowance 도 저장은 된다(리허설 triggerConstantContract 로 확인. 잔고 검사는 transferFrom 때).
+
+[2] 허락증의 글자 — ethers.Interface 로 approve calldata 만들고 되읽기
+  calldata: 0x095ea7b3000000000000000000000000b6e708a39781c96bd399c7657780ff9fe9f052a800000000000000000000000000000000000000000000000000000000002dc6c0
+  길이: 68 bytes = 선택자 4 + 주소 32 + 금액 32
+  선택자 (앞 4바이트): 0x095ea7b3 = keccak256("approve(address,uint256)")[:4] MATCH
+  워드 1 (spender): 000000000000000000000000b6e708a39781c96bd399c7657780ff9fe9f052a8 → TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK
+  워드 2 (amount): 00000000000000000000000000000000000000000000000000000000002dc6c0 → 3000000 = 3 USDT
+  parseTransaction: approve(0xb6E708a39781c96Bd399C7657780Ff9Fe9F052A8, 3000000)
+  무제한 허락증의 워드 2: ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff → 2^256-1
+  ⚠️  앱이 보여 주는 hex 가 "095ea7b3 + 주소 + ffff…" 이면 그 주소에게 내 토큰 전부를 허락하는 것입니다.
+  💬 selector 095ea7b3 는 EVM 과 같다. ethers Interface.encodeFunctionData(0x 주소) 결과가 트론 data 와 동일. 디코딩은 parseTransaction.
+
+[3] 리허설 — triggerConstantContract(approve) → energy_used (아무것도 보내지 않음)
+  에너지 가격 (getEnergyFee): 100 sun/energy
+  result: true
+  energy_used: 22688 → 스테이킹 에너지가 없으면 22688 × 100 sun = 2.2688 TRX 소각
+  constant_result[0]: 0000000000000000…00000001 (true)
+  feeLimit 30 TRX 와 비교: 2.2688 TRX ≤ 30 TRX → 상한 안
+  ✅ 리허설은 공짜입니다. 장부에는 아무것도 적히지 않았습니다.
+  💬 triggerConstantContract 는 상태를 바꾸지 않는 시뮬레이션. energy_used 로 feeLimit 을 잡는다(레슨 10 에서 자세히).
+
+[4] 봉투 만들기 — triggerSmartContract 미서명 빌드 (feeLimit 30 TRX, 서명·전송 없음)
+  txID: a2a37bed5db41ec09af29c4bdba773351125989bf5eb4155b69533c5e360c7e6
+  contract.type: TriggerSmartContract
+  contract_address: 41eca9bc828a3005b9a3b909f2cc5c2a54794de05f → TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf
+  owner_address: 41c8599111f29c1e1e061265b4af93ea1f274ad78a → TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  fee_limit: 30000000 sun = 30 TRX
+  data: 095ea7b3… (68 bytes)
+  ethers calldata 와 비교: MATCH (트론 data = EVM calldata)
+  expiration: 2026-09-12T14:57:33.000Z (생성 후 60초)
+  signature: 없음 — 아직 도장을 안 찍었습니다
+  ✅ 봉투는 만들었지만 서명도 브로드캐스트도 하지 않았습니다.
+
+[5] 관문(guard) — 무제한 허락증(2^256-1)은 이 저장소가 막습니다
+  UNLIMITED: 115792089237316195423570985008687907853269984665640564039457584007913129639935 (= 2^256-1)
+  guard 의 차단 기준: approveAmount ≥ UNLIMITED / 2 이면 GuardError
+  이번 금액 3 USDT (3000000): 통과 (필요한 만큼만)
+  무제한 금액 (2^256-1): ⚠️ 차단 대상 — SEND_TX 가 true 여도, 내 니모닉이어도 4번째 관문에서 막힙니다
+  assertCanSend(무제한) → GuardError: SEND_TX=false (기본값) 이므로 무제한 approve을(를) 보내지 않습니다. 실제로 보내려면 SEND_TX=true 를 앞에 붙이세요.
+  관문 순서: SEND_TX → 데모 니모닉 → 메인넷 host → 무제한 금액. 앞 관문에서 먼저 멈추면 그 메시지가 나옵니다.
+  ⚠️  앱에서 "무제한 승인(Unlimited)"을 고르면 그 spender 는 내 사탕통을 통째로 꺼내 갈 수 있습니다. 필요한 만큼만.
+  ✅ 규칙 9: 허락(approve)은 필요한 만큼만, 다 쓰면 0으로.
+  💬 guard 는 approveAmount ≥ (2^256-1)/2 를 무제한으로 본다. 앱 UI 의 "unlimited" 도 같은 값(uint256 max)이다.
+
+[6] 실제 허락증 쓰기 — approve(3 USDT) → allowance 확인 → approve(0) (SEND_TX=true + 내 니모닉일 때만)
+  ⚠️  SEND_TX=false (기본값) 이므로 USDT approve(3)을(를) 보내지 않습니다. 실제로 보내려면 SEND_TX=true 를 앞에 붙이세요.
+  참고: 데모 주소는 계정 권한 키가 남의 것으로 바뀌어 있어(레슨 3·13), 설령 보내도 노드가 거부합니다.
+
+🛑 미리보기 종료 — 아무것도 보내지 않았습니다. allowance 는 그대로입니다.
+   실제로 하려면(연습용 니모닉 + Nile 만): SEND_TX=true npm run l09  (approve 뒤 자동으로 approve(0) 까지 실행)
+  💬 GuardError 는 정상 흐름. exit 0. SEND_TX=true 면 approve → 폴링 → allowance → approve(0) → 폴링 → allowance.
+
+➡️  다음: Lesson 10 리허설: 보내기 전에 미리 해보기 — triggerConstantContract 와 estimateEnergy 로 실패를 미리 봅니다.

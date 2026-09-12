@@ -1,0 +1,67 @@
+$ npm run l10   # 데모 니모닉, SEND_TX=false, 2026-09-12 실행 (exit 0)
+
+Lesson 10 — 리허설: 보내기 전에 미리 해보기
+네트워크: Nile 테스트넷 (https://nile.trongrid.io) — 읽기 전용, 아무것도 보내지 않습니다.
+
+[1] 지갑과 리허설 대상 준비
+  ⚠️  데모 니모닉(공개 값)입니다 (데모 모드: 조회·리허설만, 전송 없음).
+  니모닉: 12단어 (abandon … about) ← 데모
+  보내는 사람(from): TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  받는 사람(to): TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK
+  사탕통(USDT 컨트랙트): TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf
+  금액: 1 USDT (= 1,000,000 최소 단위, decimals 6)
+  함수: transfer(address,uint256)
+  💬 triggerConstantContract = eth_call 에 해당. from 주소만 있으면 되고, 개인키·서명·브로드캐스트 없음.
+
+[2] 소액 transfer 리허설 — triggerConstantContract (1 USDT)
+  result: {"result":true}
+  energy_used: 14,650 (이 호출을 실제로 실행하면 드는 에너지)
+  constant_result[0]: 0000000000000000… (32 bytes)
+  해석: 전부 0 → 이 컨트랙트의 transfer 는 bool 을 돌려주지 않습니다 (Tether 계열 특성). 성공 여부는 result 와 REVERT 유무로 판단합니다.
+  logs(발자국) 개수: 1 (리허설에서도 Transfer 이벤트가 나옵니다. 장부에는 남지 않습니다)
+  transaction.txID: 39a5a3febfe792b500c817e453fbc177c19fe6124c110c0cea868fca2cd783c6 ← 만들어졌지만 서명도 브로드캐스트도 안 했습니다
+  ✅ 리허설 성공. 이 봉투를 실제로 보내면 성공할 가능성이 높습니다 (같은 블록 상태라면).
+  💬 constant_result 가 32바이트 0 인 것은 Tether 컨트랙트가 bool 을 안 돌려주기 때문. 성공 판단은 예외/REVERT 유무로.
+
+[3] 잔고 초과 transfer 리허설 — 실패하는 봉투는 리허설에서 걸러진다
+  내 USDT 잔고: 19589.654444 USDT (19,589,654,444 최소 단위)
+  리허설 금액: 19589.654445 USDT (잔고 + 1 최소 단위)
+  tronweb 예외: REVERT opcode executed
+  ✅ REVERT opcode executed — 컨트랙트가 "잔고 부족"으로 되돌렸습니다. 리허설이라 아무 비용도 안 들었습니다.
+  노드 원본 result: {"result":true,"message":"REVERT opcode executed"}
+  노드 원본 energy_used: 1,984 (REVERT 까지 실행하는 데 쓴 에너지)
+  노드 원본 constant_result: [""]
+  message 해석: REVERT opcode executed — 노드는 "실행은 했다(result:true)"고 하면서 message 로 REVERT 를 알립니다. 진짜 성공 판단은 message 유무입니다.
+  ⚠️  이 봉투를 리허설 없이 실제로 보냈다면: REVERT 로 실패하고도 실행에 쓴 에너지·대역폭만큼 수수료가 나갑니다. 실패는 공짜가 아닙니다.
+  💬 tronweb 은 result.message 가 있으면 throw. 노드 원본은 { result: { result: true, message: "REVERT opcode executed" }, energy_used }. 직접 fetch 하면 message 를 그대로 볼 수 있다.
+
+[4] 필요 에너지 추정 (estimateEnergy) → feeLimit 계산
+  estimateEnergy.energy_required: 21,975
+  리허설 energy_used 와 비교: 14,650 vs 21,975 → 이번 실행에서는 estimateEnergy 가 더 큰(보수적인) 값을 냈습니다. feeLimit 은 큰 쪽으로 잡습니다.
+  에너지 가격(getEnergyFee): 100 sun/energy
+  에너지 스테이킹이 없을 때 소각: 21,975 × 100 sun = 2,197,500 sun (2.1975 TRX)
+  feeLimit = 소각 × 1.2: 2,637,000 sun (2.637 TRX)
+  트랜잭션에 넣는 값: { feeLimit: 2637000 }  // sun 단위
+  ✅ feeLimit 은 "이 호출에 최대 얼마까지 태워도 되나"의 상한입니다. 너무 작으면 실패, 너무 크면 실패 시 그만큼 잃을 수 있습니다.
+  💬 feeLimit 은 에너지 소각 상한(sun). 스테이킹 에너지가 있으면 그만큼은 소각되지 않는다. 대역폭 비용은 feeLimit 과 별개.
+
+[5] 보내기 전 점검표 7항목
+  ✅ 1. 주소 형식               TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK → isAddress true
+  ✅ 2. 수신자 활성화             getAccount(to) 에 내용 있음 (활성화됨)
+  ✅ 3. TRX 잔고              55167.40859 TRX (feeLimit 2.637 TRX 이상 필요)
+  ✅ 4. USDT 잔고 ≥ 금액        19589.654444 USDT ≥ 1 USDT
+  ✅ 5. 대역폭/에너지             에너지 1,323,765 남음 (필요 21,975), 대역폭 11,932 남음 → 스테이킹 에너지로 충분
+  ✅ 6. 네트워크(Nile)          https://nile.trongrid.io — 상대가 말한 나라와 글자까지 같은지 확인
+  ✅ 7. feeLimit 설정         2,637,000 sun (2.637 TRX)
+  점검 결과: ✅ 7 / ❌ 0 / ❓ 0 (7항목)
+  ✅ 7항목 모두 통과. 이제 레슨 5·6 순서대로 봉투 → 도장 → (SEND_TX=true) 우체통입니다. 이 레슨은 보내지 않습니다.
+  ⚠️  데모 주소는 권한 키가 바뀌어 있어 점검을 통과해도 실제 전송은 거부됩니다 (레슨 13에서 확인).
+  💬 리허설은 "컨트랙트 실행"만 검증한다. 수신자 활성화·자원·feeLimit·네트워크는 별도 조회로 확인해야 한다.
+
+[6] (선택) 옆 나라 BTTC 에도 리허설이 있다 — estimateGas (레슨 11 예고)
+  BTTC Donau 테스트넷 (chainId 1029): estimateGas 21000 gas × gasPrice 9000000000000000 wei ≈ 189.0 BTT (단순 전송, 테스트넷 값)
+  비교: 트론은 에너지(21,975) × sun 가격, BTTC 는 gas(21000) × gasPrice. 이름은 달라도 "리허설로 비용을 먼저 본다"는 같습니다.
+  API 대응: eth_estimateGas ↔ estimateEnergy, eth_call ↔ triggerConstantContract. 레슨 11에서 같은 키로 BTTC 를 직접 다룹니다.
+  ✅ 규칙 10: 앱이 "실패할 것 같다"고 하면 보내지 않는다.
+
+➡️  다음: Lesson 11 한 열쇠, 두 나라, 두 경로 — 같은 열쇠로 옆 나라 BTTC 우편함을 열고, 나라 이름을 글자까지 맞춥니다.

@@ -1,0 +1,36 @@
+# 주 1회 재검증 — 13개 레슨 스크립트를 읽기 전용·미리보기 모드로 모두 실행한다.
+#
+# 왜 필요한가: 레슨의 숫자(가스 가격, 에너지 가격, 데모 주소 잔고, faucet·탐색기 주소)는
+# 테스트넷 값이라 예고 없이 바뀐다. 깨진 곳을 사람이 아니라 이 워크플로가 먼저 찾는다.
+# 실패하면 CHANGELOG.md 의 "값이 달라졌을 때 할 일" 순서를 따른다.
+#
+# 시크릿은 필요하지 않다: tools/verify-readonly.js 가 공개된 데모 니모닉(DEMO_MNEMONIC)과
+# SEND_TX=false 를 직접 환경변수로 넣어 실행한다. 이 워크플로는 실제 전송을 하지 않는다.
+
+name: 주 1회 레슨 재검증 (reverify)
+
+on:
+  schedule:
+    # 매주 월요일 03:00 UTC (한국시간 월요일 12:00)
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+jobs:
+  reverify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node 준비
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 의존성 설치
+        run: npm install
+
+      - name: 읽기 전용 재검증 (13개 레슨, SEND_TX=false)
+        run: node tools/verify-readonly.js

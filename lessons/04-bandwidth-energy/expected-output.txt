@@ -1,0 +1,65 @@
+$ npm run l04   # 데모 니모닉, SEND_TX=false, 2026-09-12 실행 (exit 0)
+
+Lesson 04 — 연료: 대역폭 입장권과 에너지 입장권
+네트워크: Nile 테스트넷 (https://nile.trongrid.io) — 읽기 전용, 아무것도 보내지 않습니다.
+  ⚠️  데모 모드: MNEMONIC 이 없거나 데모 니모닉이어서, 데모 니모닉(abandon abandon … about (12단어, SHOW_SECRETS=true 로 전체 표시))의 주소를 조회합니다.
+  조회 주소: TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  탐색기: https://nile.tronscan.org/#/address/TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+
+[1] 내 계정의 자원(대역폭·에너지) 한도와 사용량 — getAccountResources
+  무료 대역폭(종이 입장권): 0 / 600 사용 → 남은 600 bytes (매일 새로 채워짐)
+  스테이킹 대역폭: 0 / 11332 사용 → 남은 11332 bytes
+  에너지(기계 입장권): 0 / 1323765 사용 → 남은 1323765 (무료 없음)
+  네트워크 전체 한도: 대역폭 43,200,000,000 / 에너지 180,000,000,000
+  tronPowerLimit(투표권): 35899
+  ✅ 스테이킹으로 얻은 에너지가 있습니다.
+  💬 freeNetLimit=600 은 계정마다 매일 리셋. EnergyLimit 은 스테이킹(freezeBalanceV2)으로만 생긴다. 사용량 0 → 필드 생략 → ?? 0.
+
+[2] 체인 가격표 — getChainParameters + 가격 변경 이력
+  getCreateAccountFee (새 계정 생성 수수료): 100,000 sun (0.1 TRX)
+  getTransactionFee (대역폭 1 byte 가격): 1,000 sun (0.001 TRX)
+  getCreateNewAccountFeeInSystemContract (새 계정 활성화(시스템 컨트랙트)): 1,000,000 sun (1 TRX)
+  getEnergyFee (에너지 1 단위 가격): 100 sun (0.0001 TRX)
+  getTotalEnergyLimit (네트워크 전체 에너지 한도): 180,000,000,000 energy
+  getMemoFee (메모(data) 붙이기): 1,000,000 sun (1 TRX)
+  대역폭 가격 이력: 4번 변경(초기값 10 sun 포함 5항목), 현재 1000 sun/byte (마지막 변경 2021-07-14 09:10 UTC)
+  에너지 가격 이력: 100 → 10 → 40 → 140 → 140 → 140 → 420 → 280 → 420 → 210 → 100 sun (마지막 변경 2025-08-08 09:10 UTC)
+  에너지 현재 가격: 100 sun/energy
+
+[3] TRX 전송 1건은 몇 바이트? — 로컬 빌드만(브로드캐스트 없음)
+  보내는 사람 → 받는 사람: TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH → TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK (1 TRX, 서명·전송 안 함)
+  txID: 15a4060a09a8a4f5c1b3477f09f50caa78c9bf8f7417ce53c6020255dc9eba91
+  raw_data_hex 크기: 133 bytes
+  서명 크기: 65 bytes (1개)
+  raw_data + 서명: 198 bytes
+  실제 체인 receipt 관찰값: net_fee 266,000 sun = 266 bytes × 1000 sun (protobuf 봉투 포함)
+  무료 대역폭을 쓴 경우: net_usage 에 바이트가 적히는지는 확인 필요 — 정산은 내 receipt 로 확인하세요
+  무료 대역폭으로 보낼 때: 600 - 266 = 334 bytes 남음, 소각 0 TRX
+  무료 대역폭이 없을 때 소각: 266 bytes × 1000 sun = 266,000 sun (0.266 TRX)
+  하루 600 bytes 로 가능한 단순 전송: 약 2건
+  💬 raw_data_hex 133B + sig 65B = 198B 는 하한. 관찰된 receipt 값은 net_fee 266000 sun(= 266B × 1000). 정산은 항상 내 receipt 로.
+
+[4] USDT 전송에 필요한 에너지 — estimateEnergy (리허설, 전송 없음)
+  USDT 를 이미 가진 주소로 (TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK): energy_required 21,975 → 스테이킹 없으면 21975 × 100 sun = 2,197,500 sun (2.1975 TRX) 소각
+  USDT 가 0 인 새 주소로 (TGVURycDcx7pEoD8jDwPd3vprTLDJrHHZm): energy_required 37,063 → 스테이킹 없으면 37063 × 100 sun = 3,706,300 sun (3.7063 TRX) 소각
+  에너지 잔량과 비교: 남은 에너지 1323765 → 스테이킹 에너지로 충분
+  💬 estimateEnergy 는 노드 시뮬레이션. feeLimit 은 이 값 × 에너지 가격보다 여유 있게(레슨 10).
+
+[5] 시나리오: "TRX 0 + USDT 100" 지갑은 무엇을 할 수 있을까?
+  잔고 조회·받기 → 가능: 읽기와 받기는 입장권이 안 듭니다
+  TRX 보내기 → 불가능: 보낼 TRX 자체가 0
+  USDT 보내기 (무료 대역폭 있음) → 불가능: 바이트는 무료 600 으로 되지만 에너지 21975 을 태울 TRX 가 0
+  USDT 보내기 (무료 대역폭도 없음) → 불가능: 에너지 + 대역폭 둘 다 TRX 소각 필요
+  해결책 → TRX 를 먼저 채우기: 최소 2.1975 TRX(에너지) + 여유분, 대역폭까지 태우면 + 약 0.266 TRX
+  ⚠️  규칙 4: USDT만 있고 TRX가 0이면 아무것도 못 보낸다. 연료(입장권)가 먼저다.
+  💬 USDT 는 TRC-20 컨트랙트의 상태, 연료는 계정 상태. 전송 전 점검: TRX 잔고 ≥ energy×price + bytes×price.
+
+[6] 처음 받는 주소로 보내면 활성화 비용 — getAccount 가 {} 인 계정
+  새 주소 TGVURycDcx7pEoD8jDwPd3vprTLDJrHHZm: getAccount → {} (활성화 안 됨)
+  이 주소로 처음 TRX 를 보내면: 활성화 비용 1,000,000 sun (1 TRX) 가 추가로 듭니다 (getCreateNewAccountFeeInSystemContract)
+  받는 주소 TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK: 이미 활성화됨 → 활성화 비용 없음
+  메모를 붙이면: 1,000,000 sun (1 TRX) 추가 (getMemoFee)
+  💬 수신자 getAccount 가 {} 면 전송 시 1 TRX 추가 소각. 레슨 6 에서 전송 전 경고로 사용한다.
+
+요약: 대역폭 = 바이트(매일 600 무료), 에너지 = 컨트랙트 실행(무료 없음). 부족하면 TRX 소각. 스테이킹으로 미리 확보.
+➡️ 다음: Lesson 05 편지 쓰고 도장 찍기(아직 안 보내요)

@@ -1,0 +1,74 @@
+$ npm run l02   # 데모 니모닉, SEND_TX=false, 2026-09-12 실행 (exit 0)
+
+Lesson 02 — 열쇠에서 우편함 번호가 나와요 (규칙 2: 주소는 모두에게, 열쇠는 아무에게도)
+  니모닉: abandon abandon … about (12단어, SHOW_SECRETS=true 로 전체 표시) — 12단어 (abandon … about) [데모]
+
+[1] 경로 m/44'/195'/0'/0/0 로 열쇠(개인키)와 공개키 만들기
+  경로: m/44'/195'/0'/0/0
+  개인키(32바이트): b5a4…9a28 (SHOW_SECRETS=true 로 전체 표시)
+  압축 공개키(33바이트): 0x03ff21f8e64d3a3c0198edfbb7afdc79be959432e92e2f8a1984bb436a414b8edc
+  비압축 공개키(65바이트): 0x04ff21f8e64d3a3c0198edfbb7afdc79be959432e92e2f8a1984bb436a414b8edcec0345aad0c1bf7da04fd036dd7f9f617e30669224283d950fab9dd84831dc83
+  ✅ TronWeb.fromMnemonic 의 개인키·비압축 공개키와 정확히 일치
+  💬 secp256k1: pub = priv·G. 압축(33B)은 x 와 y 의 홀짝만, 비압축(65B)은 x, y 모두. 트론 주소는 비압축의 64바이트를 쓴다.
+
+[2] 공개키 → keccak256 → 뒤 20바이트 → 0x41 붙이기 → base58check = T주소 (손으로 만들기)
+  keccak256 입력(공개키 64바이트): 0xff21f8e64d3a3c0198ed… (64바이트)
+  keccak256 결과(32바이트): 0x16030ddba3ad8871035229b3c8599111f29c1e1e061265b4af93ea1f274ad78a
+  뒤 20바이트: c8599111f29c1e1e061265b4af93ea1f274ad78a
+  '41' + 20바이트 = 21바이트: 41c8599111f29c1e1e061265b4af93ea1f274ad78a
+  체크섬 = sha256(sha256(21바이트)) 앞 4바이트: 1912f84c
+  base58(21바이트 + 체크섬 4바이트): TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  TronWeb.address.fromPrivateKey: TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  ✅ 손으로 만든 주소 == TronWeb 주소 (34글자, T로 시작)
+  개인키 마지막 한 글자만 바꾼 "이웃 열쇠"의 주소: TCXechLiHQuF4J8DroYoc1KhSVutYVWxic
+  ⚠️  열쇠가 한 글자만 달라도 주소는 처음부터 끝까지 다르다. 주소에서 열쇠로 되돌아가는 길은 없다(해시는 한 방향).
+  💬 T주소 = base58check(0x41 ‖ keccak256(pubkey64)[-20:]). 체크섬 4바이트가 붙어서 오타를 잡는다.
+
+[3] T주소 ↔ 41hex ↔ 0x주소 변환 (T주소 안에 옆 나라 주소가 숨어 있다)
+  T주소: TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  TronWeb.address.toHex: 41c8599111f29c1e1e061265b4af93ea1f274ad78a
+  TronWeb.address.fromHex: TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  '41' 을 떼고 '0x' 를 붙이면: 0xC8599111F29c1e1E061265b4AF93eA1F274aD78A
+  lib/wallet 의 evmAddress(ethers 가 계산): 0xC8599111F29c1e1E061265b4AF93eA1F274aD78A
+  ✅ T주소의 20바이트 == 같은 열쇠의 EVM(0x) 주소. 트론 주소는 "0x주소 + 프리픽스 41 + 체크섬" 이다
+  비티의 예고: "네 우편함 번호 안에 우리 나라 번호가 숨어 있어!" — 이 0x주소는 레슨 11에서 BTTC(옆 나라)의 주소로 다시 만난다
+  💬 TronWeb.address.toHex(T) → '41'+40hex, fromHex → T. ethers.getAddress('0x'+hex40) 는 ethers 가 만드는 대소문자 섞인 체크섬 표기.
+
+[4] 같은 12단어, 다른 우편함: 경로 인덱스 0~4 의 주소 5개
+  index | 경로                     | T주소                              | 0x주소
+  ------+--------------------------+------------------------------------+-------------------------------------------
+  0     | m/44'/195'/0'/0/0        | TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH | 0xC8599111F29c1e1E061265b4AF93eA1F274aD78A
+  1     | m/44'/195'/0'/0/1        | TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK | 0xb6E708a39781c96Bd399C7657780Ff9Fe9F052A8
+  2     | m/44'/195'/0'/0/2        | TYJPRrdB5APNeRs4R7fYZSwW3TcrTKw2gx | 0xf4f35FFF5Ca9Ee43ACa2c57DED9d9EC66ac42Dd0
+  3     | m/44'/195'/0'/0/3        | TRhVWK5XEDkQBDevcdCWW7RW51aRncty4W | 0xAC892261eD306C7C91ff84895811Fa2E5e58333D
+  4     | m/44'/195'/0'/0/4        | TT2X2yyubp7qpAWYYNE5JQWBtoZ7ikQFsY | 0xBb1A70862E804Bfe2885F6c7EfC8fDF3f0148b00
+  ✅ 주소 5개가 모두 다르다. 열쇠도 각각 다르지만 12단어 하나로 전부 다시 만들 수 있다
+  참고: index 1 주소(TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK)는 뒤 레슨에서 "기본 수신자"로 쓴다 (자기 자신에게는 보낼 수 없기 때문)
+
+[5] 이더리움 경로(coin_type 60')로 만들면 다른 주소가 나온다
+  트론 경로 m/44'/195'/0'/0/0: TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  이더 경로 m/44'/60'/0'/0/0: TPrkFhZ8LH8Mruco8vXyA496TaeFBrbmeU  (0x 표기: 0x9858EfFD232B4033E47d90003D41EC34EcaEda94)
+  ✅ 같은 12단어라도 경로가 다르면 열쇠가 다르고 주소도 다르다
+  ⚠️  지갑 앱마다 어느 경로를 쓰는지 다를 수 있다. 다른 앱에서 복구했는데 잔고가 0으로 보이면 "경로가 다른가?"를 먼저 의심한다.
+  💬 HDNodeWallet.fromPhrase(mnemonic, undefined, "m/44'/60'/0'/0/0") 의 privateKey 를 T주소로 바꿔도 195' 경로와 다르다. 데모 니모닉이면 TPrkFhZ8… vs TUEZ….
+
+[6] 오타 감지(base58check)와 "앞뒤만 닮은 주소" 경고
+  원래 주소: TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  11번째 글자를 바꾼 주소: TUEZSdKsoDJQMeZwihtdoBiN46zxhGWYdH
+  TronWeb.isAddress(원래): true
+  TronWeb.isAddress(오타): false
+  ✅ 한 글자 오타는 체크섬 4바이트가 잡아 준다 → 지갑 앱이 "잘못된 주소"라고 거부한다
+  앞 3글자가 같은 유효한 주소: TUEBjFNjV3NuZnnZmPgtUxGBBQbMxSPAWb  (631번 시도)
+  TronWeb.isAddress(닮은 주소): true
+  ⚠️  이 주소는 체크섬까지 멀쩡한 "진짜" 주소다. 오타가 아니라 다른 사람의 열쇠에서 나온 주소라서 앱은 거부하지 않는다.
+  T 다음 글자: base58 글자는 58종이지만, 페이로드 첫 바이트가 0x41 로 고정이라 T 다음 글자는 25종(9, A~Z 중 I·O 제외)만 나온다
+  계산: 앞 3글자 ≈ 25 × 58 ≈ 1,450번, 앞 4·뒤 4 (T 는 고정이라 실제 7글자) ≈ 25 × 58^6 ≈ 9.5×10^11번 — 사람에겐 불가능해도 컴퓨터로는 가능한 범위
+  ⚠️  그래서 "앞 4글자·뒤 4글자만 확인"은 위험하다. 전체를 비교하거나 QR·주소록을 쓴다 (주소 오염 사기).
+  💬 isAddress 는 base58 디코딩 후 sha256(sha256(payload))[:4] 를 비교한다. 접두어 매칭 주소 생성은 단순 반복이라 누구나 할 수 있다.
+
+요약
+  열쇠(개인키) → 공개키 → keccak256 → 20바이트 → 41 + 체크섬 → base58 → T주소. 방향은 한쪽뿐.
+  T주소 안에는 0x주소(옆 나라 BTTC 주소)가 그대로 들어 있다.
+  규칙 2: 주소는 모두에게, 열쇠는 아무에게도.
+
+➡️ 다음: Lesson 03 — 광장에 걸린 장부: 1 TRX는 사탕 100만 알 (npm run l03)

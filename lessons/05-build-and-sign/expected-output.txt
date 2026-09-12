@@ -1,0 +1,67 @@
+$ npm run l05   # 데모 니모닉, SEND_TX=false, 2026-09-12 실행 (exit 0)
+
+Lesson 05 · 편지 쓰고 도장 찍기(아직 안 보내요)
+네트워크: Nile 테스트넷 (https://nile.trongrid.io) — 이 레슨은 읽기만 하며 브로드캐스트하지 않습니다.
+
+[1] 보내는 사람과 받는 사람 정하기
+  ⚠️  데모 니모닉입니다 (데모 모드). 조회·서명 연습에만 씁니다.
+  니모닉: 12단어 (abandon … about)
+  보내는 사람(from, index 0): TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  받는 사람(to, 같은 니모닉 index 1): TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK
+  금액: 1 TRX = 1000000 sun
+  개인키(마스킹): b5a4…9a28 (SHOW_SECRETS=true 로 전체 표시)
+  ⚠️  데모 주소는 owner/active 권한 키가 다른 사람 키로 바뀌어 있어, 실제 전송은 어차피 노드가 거부합니다.
+  ⚠️  그래도 봉투 만들기·읽기·도장 찍기 연습은 똑같이 할 수 있습니다.
+  💬 from/to 는 T주소, 금액은 sun(정수). 개인키는 아직 쓰지 않는다(빌드에는 필요 없음).
+
+[2] 봉투 만들기 — sendTrx 빌드(미서명, 브로드캐스트 없음)
+  contract[0].type: TransferContract
+  owner_address (hex41): 41c8599111f29c1e1e061265b4af93ea1f274ad78a → TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  to_address (hex41): 41b6e708a39781c96bd399c7657780ff9fe9f052a8 → TSeJkUh4Qv67VNFwY8LaAxERygNdy6NQZK
+  amount (sun): 1000000 = 1 TRX
+  ref_block_bytes / ref_block_hash: dc4c / 7aa758ebf963d29a (최근 블록 참조)
+  timestamp: 1789224609000 = 2026-09-12T14:50:09.000Z
+  expiration: 1789224669000 = 2026-09-12T14:51:09.000Z (timestamp + 60초)
+  raw_data_hex 크기: 133 bytes
+  signature: (없음 — 아직 도장을 안 찍었습니다)
+  ✅ 트론에는 nonce 가 없습니다. ref_block + expiration 이 중복·재생을 막습니다.
+  💬 raw_data = { contract[TransferContract], ref_block_bytes, ref_block_hash, timestamp, expiration }. signature 필드는 아직 없다.
+
+[3] 봉투 번호(txID)는 도장 전에 정해진다 — txID === sha256(raw_data_hex)
+  txID (노드가 준 값): 15a4060a09a8a4f5c1b3477f09f50caa78c9bf8f7417ce53c6020255dc9eba91
+  sha256(raw_data_hex) (직접 계산): 15a4060a09a8a4f5c1b3477f09f50caa78c9bf8f7417ce53c6020255dc9eba91
+  ✅ 일치합니다. txID 는 서명이 아니라 봉투 내용의 해시입니다.
+  💬 txID = sha256(raw_data_hex). 서명은 이 32바이트에 대해 만든다. 레슨 7에서 이 txID 로 영수증을 찾는다.
+
+[4] 메모 붙이기(선택) — 서명 전에만 가능, 메모 수수료 1 TRX
+  MEMO: (없음) — 붙이려면 MEMO="안녕" 을 앞에 붙여 실행하세요
+  ⚠️  메모는 반드시 서명 전에 붙입니다. 서명 후에는 봉투를 고칠 수 없습니다. 메모 수수료는 1 TRX 입니다.
+  💬 addUpdateData(tx, text, "utf8") 는 새 tx 객체를 돌려준다. 서명 뒤에 부르면 실패한다.
+
+[5] 유효기간 늘리기(선택) — extendExpiration 은 반환값만 쓴다
+  EXTEND: (없음) — 기본 유효기간 60초. 늘리려면 EXTEND=600 을 앞에 붙여 실행하세요
+  ⚠️  extendExpiration 은 입력 객체의 raw_data 를 제자리에서 고치고 새 txID 를 가진 새 객체를 돌려줍니다. 반환값만 쓰세요.
+  💬 extendExpiration(tx, sec) 는 입력을 제자리 수정 + 새 객체 반환. 원본이 필요하면 미리 JSON 복사.
+
+[6] 도장 찍기 — trx.sign (오프라인, 노드 접속 없음)
+  서명 전 필드: visible, txID, raw_data_hex, raw_data
+  서명 후 필드: visible, txID, raw_data_hex, raw_data, signature
+  signature[0]: d493441657bee1c3… (130 hex = 65 bytes)
+  같은 객체인가 (signed === tx): true
+  txID 변화: 없음 (서명은 txID 를 바꾸지 않는다)
+  raw_data 변화: 없음
+  서명 전 스냅샷에 signature: 없음
+  서명 후 객체에 signature: 1개
+  ✅ trx.sign 은 입력 객체를 제자리에서 바꾸고 같은 객체를 돌려줍니다. "서명 전" 모습은 복사본에만 남습니다.
+  💬 sign 은 노드 없이 동작한다(에어갭 서명 가능). signature 는 130 hex = 65 bytes.
+
+[7] 서명된 봉투 저장 — out/05-signed.json (우체통에는 안 넣음)
+  저장 위치: out/05-signed.json
+  파일 크기: 1097 bytes
+  유효기간까지 남은 시간: 59초 (지나면 이 파일은 쓸 수 없어 새로 만들어야 합니다)
+  보내는 주소 탐색기: https://nile.tronscan.org/#/address/TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH
+  ✅ 이 레슨은 여기까지입니다. sendRawTransaction(브로드캐스트)은 호출하지 않았습니다.
+  ✅ 이 파일을 우체통에 넣는 것이 Lesson 06 입니다 (SEND_TX=true 와 .env 의 연습용 니모닉이 필요).
+  ⚠️  데모 니모닉으로는 Lesson 06 도 전송하지 않습니다(guard 가 막고, 권한도 바뀌어 있습니다).
+
+➡️ 다음: Lesson 06 진짜로 보내기(연습 나라에서) — 도장 찍은 봉투를 우체통에 넣습니다.

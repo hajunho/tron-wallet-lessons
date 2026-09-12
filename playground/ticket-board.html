@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>입장권 계산판 (대역폭·에너지) — tron-wallet-lessons</title>
+<meta name="description" content="Lesson 04 놀이터. 봉투 크기(바이트)와 에너지 양을 넣으면 태워야 하는 TRX(사탕)를 계산한다. 외부 요청 없음, 연습 나라 전용.">
+<style>
+  /* 단일 파일, 외부 요청 없음. 색만으로 뜻을 나타내지 않고 글자·기호를 항상 함께 쓴다. */
+  :root {
+    --bg: #fbf9f4;
+    --panel: #ffffff;
+    --ink: #1f2430;
+    --muted: #5b6270;
+    --line: #d9d4c7;
+    --accent: #b3261e;      /* 경고 배너 */
+    --accent-bg: #fdecea;
+    --ok: #1b6e3a;
+    --ok-bg: #e8f5ec;
+    --link: #0b57a4;
+    --focus: #ff8c00;
+    --chip: #eef1f5;
+    --chip-on: #1f2430;
+    --chip-on-ink: #ffffff;
+    --code-bg: #f1efe8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15171c; --panel: #1e2128; --ink: #ecebe6; --muted: #aab0bb;
+      --line: #3a3f4a; --accent: #ff8a80; --accent-bg: #3a1f1d; --ok: #8fd6a4; --ok-bg: #1d3325;
+      --link: #8ab4f8; --chip: #2a2e37; --chip-on: #ecebe6; --chip-on-ink: #15171c; --code-bg: #2a2e37;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  a { color: var(--link); }
+  a:focus-visible, button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .skip {
+    position: absolute; left: -999px; top: 0;
+    background: var(--panel); color: var(--ink); padding: 8px 12px; border: 2px solid var(--ink);
+  }
+  .skip:focus { left: 8px; top: 8px; z-index: 10; }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+
+  .banner {
+    border: 2px solid var(--accent);
+    background: var(--accent-bg);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+  .banner strong { color: var(--accent); }
+  .banner p { margin: 4px 0 0; font-weight: 400; font-size: 0.95em; }
+
+  header h1 { font-size: 1.5rem; margin: 8px 0 4px; }
+  header .sub { color: var(--muted); margin: 0 0 12px; }
+
+  nav.lessons { margin: 8px 0 16px; }
+  nav.lessons h2 { font-size: 1rem; margin: 0 0 6px; }
+  nav.lessons ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  nav.lessons a {
+    display: inline-block; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+    background: var(--panel); text-decoration: none; font-size: 0.9em;
+  }
+
+  section.panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px; margin-bottom: 14px;
+  }
+  section.panel h2 { font-size: 1.1rem; margin: 0 0 10px; }
+  section.panel h3 { font-size: 1rem; margin: 12px 0 6px; }
+
+  .prices { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; grid-template-columns: 1fr; font-size: 0.92em; }
+  @media (min-width: 560px) { .prices { grid-template-columns: 1fr 1fr; } }
+  .prices li { padding: 6px 10px; border-radius: 8px; background: var(--chip); }
+  .prices code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95em; }
+
+  .scen { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+  .scen button {
+    font: inherit; font-size: 0.92em; cursor: pointer;
+    padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--chip); color: var(--ink);
+  }
+  .scen button[aria-pressed="true"] {
+    background: var(--chip-on); color: var(--chip-on-ink); border-color: var(--chip-on);
+  }
+  .scen button[aria-pressed="true"]::before { content: "✔ "; }
+  .scen-note { color: var(--muted); font-size: 0.9em; margin: 8px 0 0; min-height: 1.4em; }
+
+  form .grid { display: grid; gap: 10px; grid-template-columns: 1fr; }
+  @media (min-width: 560px) { form .grid { grid-template-columns: 1fr 1fr; } }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-weight: 600; font-size: 0.95em; }
+  .field .hint { color: var(--muted); font-size: 0.85em; }
+  .field input[type="number"] {
+    font: inherit; font-size: 1.05em; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%;
+  }
+  .field.check { flex-direction: row; align-items: flex-start; gap: 8px; }
+  .field.check input { width: 22px; height: 22px; margin-top: 2px; }
+  .field.check label { font-weight: 600; }
+  .field.check .hint { display: block; font-weight: 400; }
+  .field.check .hint-inline { display: block; }
+  fieldset { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0 0 10px; }
+  legend { font-weight: 600; padding: 0 6px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .actions button {
+    font: inherit; cursor: pointer; padding: 8px 14px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--chip); color: var(--ink); font-weight: 600;
+  }
+  .actions button.primary { background: var(--chip-on); color: var(--chip-on-ink); border-color: var(--chip-on); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.95em; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.total td { font-weight: 700; border-top: 2px solid var(--ink); }
+  .table-wrap { overflow-x: auto; }
+  .zero { color: var(--muted); }
+
+  .verdict {
+    border: 2px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-top: 10px; font-weight: 600;
+  }
+  .verdict.ok { border-color: var(--ok); background: var(--ok-bg); }
+  .verdict.no { border-color: var(--accent); background: var(--accent-bg); }
+  .verdict p { margin: 4px 0 0; font-weight: 400; font-size: 0.95em; }
+
+  .kid { border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; }
+  .kid p { margin: 6px 0; }
+  .tickets { font-size: 1.4em; line-height: 1.3; letter-spacing: 2px; word-break: break-all; }
+  .tickets .rest { font-size: 0.7em; letter-spacing: 0; color: var(--muted); }
+  .legend { color: var(--muted); font-size: 0.88em; margin: 4px 0 0; }
+  .story { margin: 8px 0 0; }
+
+  details { margin-top: 10px; }
+  summary { cursor: pointer; font-weight: 600; }
+  pre { background: var(--code-bg); padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 0.85em; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  footer { margin-top: 24px; color: var(--muted); font-size: 0.88em; border-top: 1px solid var(--line); padding-top: 12px; }
+  footer ul { margin: 6px 0 0; padding-left: 18px; }
+  kbd { font-family: inherit; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 0.9em; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<div class="wrap">
+
+  <div class="banner" role="alert">
+    ⚠️ <strong>연습 나라 전용.</strong> 진짜 열쇠(12단어·개인키)는 절대 입력하지 마세요.
+    <p>이 계산판에는 열쇠를 넣는 칸이 없습니다. 숫자만 넣습니다. 열쇠나 12단어를 달라는 페이지는 이 저장소에 하나도 없고,
+      노드 아저씨도 고객센터도 12단어를 묻지 않습니다. 이 페이지는 인터넷에 아무것도 보내지 않습니다.</p>
+  </div>
+
+  <header>
+    <h1>🎫 입장권 계산판 (대역폭·에너지)</h1>
+    <p class="sub">봉투(트랜잭션) 크기와 에너지 양을 넣으면, 입장권이 모자랄 때 태워야 하는 사탕(TRX)을 계산해요.
+      규칙 4: <strong>USDT만 있고 TRX가 0이면 아무것도 못 보낸다. 연료(입장권)가 먼저다.</strong></p>
+  </header>
+
+  <nav class="lessons" aria-label="관련 레슨">
+    <h2>📚 관련 레슨 (README로 이동)</h2>
+    <ul>
+      <li><a href="../lessons/04-bandwidth-energy/README.md">Lesson 04 (bandwidth-energy) — 이 놀이터의 본 레슨</a></li>
+      <li><a href="../lessons/10-simulate/README.md">Lesson 10 (simulate) — 에너지 필요량을 리허설로 미리 보기</a></li>
+      <li><a href="index.html">🏘️ 놀이터 허브로</a></li>
+    </ul>
+  </nav>
+
+  <main id="main">
+
+    <section class="panel" aria-labelledby="price-title">
+      <h2 id="price-title">🏷️ 가격표 (Nile 체인 파라미터, 2026-09-12 확인)</h2>
+      <ul class="prices" id="price-list"></ul>
+      <p class="legend">가격은 체인 파라미터라 바뀔 수 있어요. 코드에서는 <code>getChainParameters</code>로 읽습니다(Lesson 04 [2]).
+        사탕 1알 = 1 sun, 사탕상자 1개 = 사탕 1,000,000알 = 1 TRX.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="scen-title">
+      <h2 id="scen-title">🎬 시나리오 버튼 (누르면 아래 칸이 채워져요)</h2>
+      <div class="scen" role="group" aria-label="시나리오 고르기" id="scen-row"></div>
+      <p class="scen-note" id="scen-note" aria-live="polite"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="in-title">
+      <h2 id="in-title">✏️ 입력</h2>
+      <form id="calc-form" novalidate>
+        <fieldset>
+          <legend>📄 종이 입장권 (대역폭, bytes)</legend>
+          <div class="grid">
+            <div class="field">
+              <label for="txBytes">봉투 크기 (bytes)</label>
+              <input type="number" id="txBytes" name="txBytes" min="0" step="1" value="266" inputmode="numeric">
+              <span class="hint">단순 TRX 전송 1건 ≈ 266 bytes (체인 receipt에서 관찰). 정확한 값은 receipt의 net_usage로 확인.</span>
+            </div>
+            <div class="field">
+              <label for="freeUsed">오늘 이미 쓴 무료 대역폭 (0~600)</label>
+              <input type="number" id="freeUsed" name="freeUsed" min="0" max="600" step="1" value="0" inputmode="numeric">
+              <span class="hint">계정마다 매일 600 bytes 무료(freeNetLimit=600). getAccountResources의 freeNetUsed.</span>
+            </div>
+            <div class="field">
+              <label for="stakedNet">스테이킹으로 얻은 대역폭 (남은 양, bytes)</label>
+              <input type="number" id="stakedNet" name="stakedNet" min="0" step="1" value="0" inputmode="numeric">
+              <span class="hint">TRX를 맡겨(freezeBalanceV2) 얻은 NetLimit − NetUsed. 없으면 0.</span>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>⚙️ 기계 입장권 (에너지)</legend>
+          <div class="grid">
+            <div class="field">
+              <label for="energyNeed">필요한 에너지</label>
+              <input type="number" id="energyNeed" name="energyNeed" min="0" step="1" value="14650" inputmode="numeric">
+              <span class="hint">단순 TRX 전송은 0. USDT transfer 시뮬레이션 energy_used 14,650 / estimateEnergy 21,975(수신자 USDT 보유) · 37,063(수신자 USDT 0).</span>
+            </div>
+            <div class="field">
+              <label for="energyHave">보유 에너지 (남은 양)</label>
+              <input type="number" id="energyHave" name="energyHave" min="0" step="1" value="0" inputmode="numeric">
+              <span class="hint">무료 에너지는 없어요. EnergyLimit − EnergyUsed. 스테이킹이 없으면 0.</span>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>➕ 고정 요금</legend>
+          <div class="grid">
+            <div class="field check">
+              <input type="checkbox" id="newRecipient" name="newRecipient">
+              <label for="newRecipient">받는 주소가 처음 받는(활성화 안 된) 주소
+                <span class="hint">getAccount가 {}인 주소로 처음 TRX를 보내면 활성화 1 TRX (getCreateNewAccountFeeInSystemContract)</span>
+              </label>
+            </div>
+            <div class="field check">
+              <input type="checkbox" id="memo" name="memo">
+              <label for="memo">메모(data)를 붙임
+                <span class="hint">메모 수수료 1 TRX (getMemoFee). 메모 글자만큼 봉투도 커지니 위의 봉투 크기도 늘려 보세요.</span>
+              </label>
+            </div>
+            <div class="field">
+              <label for="trxBalance">보유 TRX (선택, 사탕상자 개수)</label>
+              <input type="number" id="trxBalance" name="trxBalance" min="0" step="any" placeholder="비우면 판정 안 함" inputmode="decimal">
+              <span class="hint">넣으면 "이 지갑으로 보낼 수 있나?"를 판정해요. USDT 잔고는 여기에 넣지 않아요(USDT는 연료가 아님).</span>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="actions">
+          <button type="submit" class="primary">계산하기 (=)</button>
+          <button type="button" id="reset-btn">기본값으로 되돌리기</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="out-title" id="out" aria-live="polite">
+      <h2 id="out-title">🧾 결과: 태워야 하는 사탕(TRX)</h2>
+      <div class="table-wrap">
+        <table id="result-table">
+          <caption class="sr-only">항목별 소각 계산표</caption>
+          <thead>
+            <tr><th scope="col">항목</th><th scope="col">계산</th><th scope="col" class="num">사탕 (sun)</th><th scope="col" class="num">사탕상자 (TRX)</th></tr>
+          </thead>
+          <tbody id="result-body"></tbody>
+        </table>
+      </div>
+      <div class="verdict" id="verdict"></div>
+
+      <h3>🧒 초등용 그림: 입장권 몇 장?</h3>
+      <div class="kid" id="kid-view"></div>
+
+      <details>
+        <summary>💻 같은 계산을 코드로 (개발자)</summary>
+        <pre id="code-view"></pre>
+        <p class="legend">이 페이지의 <code>calcFee()</code>가 하는 계산이에요. Lesson 04 script.js [3]~[6]과 같은 식입니다.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer>
+    <p>키보드 사용법: <kbd>Tab</kbd>으로 이동, 숫자 칸에서 <kbd>↑</kbd>/<kbd>↓</kbd>로 값 바꾸기, <kbd>Enter</kbd>로 계산, <kbd>Space</kbd>로 체크·버튼.
+      값을 바꾸면 결과가 바로 갱신되고, 선택된 시나리오는 "✔" 기호로도 표시됩니다.</p>
+    <ul>
+      <li>연습 나라(Nile 테스트넷) 값 기준이에요. 연습 나라 돈은 진짜 돈이 아닙니다.</li>
+      <li>이 계산은 "스테이킹으로 얻은 자원을 먼저 쓰고, 모자란 만큼 TRX를 태운다"는 규칙만 다뤄요. 실제 정산은 항상 receipt(net_fee, energy_fee)로 확인하세요(Lesson 07).</li>
+      <li><strong>(확인 필요)</strong> 대역폭이 모자랄 때 <strong>부족한 바이트만</strong> 태우는지, <strong>전체 바이트</strong>를 태우는지는 이 저장소에서 검증하지 않았어요. 이 계산기는 "부족분만" 모델을 씁니다. 그래서 실제 수수료가 여기 숫자보다 클 수 있어요. 검증된 값은 단순 전송 영수증의 <span class="mono">net_fee 266000 sun</span>(= 266 bytes × 1,000 sun) 하나입니다.</li>
+      <li>에너지 필요량은 컨트랙트와 수신자 상태에 따라 달라요. 보내기 전에 리허설(estimateEnergy)로 확인하세요(Lesson 10).</li>
+    </ul>
+  </footer>
+</div>
+
+<script>
+// ===== 상수 (tron-facts.md, Nile getChainParameters 로 확인한 값) =====
+var PRICES = {
+  SUN_PER_TRX: 1000000,          // 1 TRX = 1,000,000 sun
+  FREE_NET_PER_DAY: 600,         // freeNetLimit: 계정마다 매일 600 bytes 무료
+  SUN_PER_BYTE: 1000,            // getTransactionFee: 1000 sun/byte
+  SUN_PER_ENERGY: 100,           // getEnergyFee: 100 sun/energy
+  ACTIVATION_SUN: 1000000,       // getCreateNewAccountFeeInSystemContract: 1 TRX
+  MEMO_SUN: 1000000              // getMemoFee: 1 TRX
+};
+
+var PRICE_ROWS = [
+  { label: '무료 대역폭', value: '하루 600 bytes / 계정', key: 'freeNetLimit' },
+  { label: '대역폭 1 byte', value: '1,000 sun (0.001 TRX)', key: 'getTransactionFee' },
+  { label: '에너지 1 단위', value: '100 sun (0.0001 TRX)', key: 'getEnergyFee' },
+  { label: '새 계정 활성화', value: '1,000,000 sun (1 TRX)', key: 'getCreateNewAccountFeeInSystemContract' },
+  { label: '메모(data) 붙이기', value: '1,000,000 sun (1 TRX)', key: 'getMemoFee' },
+  { label: '단위', value: '1 TRX = 1,000,000 sun', key: 'TronWeb.toSun / fromSun' }
+];
+
+var DEFAULTS = { txBytes: 266, freeUsed: 0, stakedNet: 0, energyNeed: 14650, energyHave: 0, newRecipient: false, memo: false, trxBalance: null };
+
+// 시나리오: 숫자는 모두 Lesson 04 실행 출력(expected-output.txt)과 tron-facts.md 에서 가져옴
+var SCENARIOS = [
+  {
+    key: 'trx-free',
+    label: '📄 TRX 전송, 무료 입장권 있음',
+    note: '단순 TRX 전송 266 bytes. 오늘 아직 안 썼으면 600장 중 266장을 쓰고 태우는 사탕은 0.',
+    values: { txBytes: 266, freeUsed: 0, stakedNet: 0, energyNeed: 0, energyHave: 0, newRecipient: false, memo: false, trxBalance: 10 }
+  },
+  {
+    key: 'trx-nofree',
+    label: '📄 TRX 전송, 무료 입장권 다 씀',
+    note: '무료 600장을 다 쓴 뒤 세 번째 전송. 266 bytes × 1,000 sun = 266,000 sun (0.266 TRX). 체인 receipt의 net_fee 266000과 같은 값.',
+    values: { txBytes: 266, freeUsed: 600, stakedNet: 0, energyNeed: 0, energyHave: 0, newRecipient: false, memo: false, trxBalance: 10 }
+  },
+  {
+    key: 'usdt-trx',
+    label: '⚙️ USDT 전송, TRX 있음, 스테이킹 없음',
+    note: 'USDT transfer 리허설 energy_used 14,650 × 100 sun = 1,465,000 sun (1.465 TRX). 봉투 바이트는 무료 대역폭으로.',
+    values: { txBytes: 266, freeUsed: 0, stakedNet: 0, energyNeed: 14650, energyHave: 0, newRecipient: false, memo: false, trxBalance: 10 }
+  },
+  {
+    key: 'usdt-zero',
+    label: '🚫 USDT만 있고 TRX 0',
+    note: '규칙 4. 에너지 21,975(estimateEnergy)를 태울 TRX가 0 → 보낼 수 없음. USDT 잔고는 연료가 아님.',
+    values: { txBytes: 266, freeUsed: 0, stakedNet: 0, energyNeed: 21975, energyHave: 0, newRecipient: false, memo: false, trxBalance: 0 }
+  },
+  {
+    key: 'usdt-staked',
+    label: '🔒 USDT 전송, 스테이킹 에너지 충분',
+    note: '데모 주소처럼 스테이킹 에너지가 1,323,767 남아 있으면 21,975를 그냥 쓰고 태우는 사탕은 0.',
+    values: { txBytes: 266, freeUsed: 0, stakedNet: 11332, energyNeed: 21975, energyHave: 1323767, newRecipient: false, memo: false, trxBalance: 10 }
+  },
+  {
+    key: 'new-memo',
+    label: '🆕 처음 받는 주소 + 메모',
+    note: 'TRX 전송인데 받는 주소가 활성화 안 됨(1 TRX) + 메모(1 TRX) → 2 TRX가 고정으로 더 붙어요.',
+    values: { txBytes: 300, freeUsed: 0, stakedNet: 0, energyNeed: 0, energyHave: 0, newRecipient: true, memo: true, trxBalance: 10 }
+  }
+];
+
+// ===== 순수 함수 (node 에서 검증 가능) =====
+function toNonNegInt(v, fallback) {
+  var n = Number(v);
+  if (!isFinite(n) || n < 0) return fallback;
+  return Math.floor(n);
+}
+
+// 입력 → 소각 계산. 자원은 "무료 대역폭 → 스테이킹 대역폭" 순으로 쓰고, 모자란 만큼 sun 을 태운다.
+//
+// (확인 필요) 이 계산기는 "모자란 바이트만큼만 태운다"는 모델을 씁니다. 무료 대역폭이 트랜잭션
+// 전체 바이트보다 적을 때 부족분만 과금되는지, 전체가 과금되는지는 이 저장소에서 검증하지
+// 않았습니다. 실제 정산 금액은 영수증(receipt)의 net_usage / net_fee 로만 확인할 수 있습니다.
+// 검증된 값: 단순 TRX 전송 영수증에서 net_fee 266000 sun (= 266 bytes x 1000 sun) 관찰.
+function calcFee(input, prices) {
+  var P = prices || PRICES;
+  var txBytes = toNonNegInt(input.txBytes, 0);
+  var freeUsed = Math.min(P.FREE_NET_PER_DAY, toNonNegInt(input.freeUsed, 0));
+  var stakedNet = toNonNegInt(input.stakedNet, 0);
+  var energyNeed = toNonNegInt(input.energyNeed, 0);
+  var energyHave = toNonNegInt(input.energyHave, 0);
+
+  var freeLeft = P.FREE_NET_PER_DAY - freeUsed;
+  var fromFree = Math.min(txBytes, freeLeft);
+  var fromStaked = Math.min(txBytes - fromFree, stakedNet);
+  var bytesShort = txBytes - fromFree - fromStaked;
+  var netBurnSun = bytesShort * P.SUN_PER_BYTE;
+
+  var fromEnergy = Math.min(energyNeed, energyHave);
+  var energyShort = energyNeed - fromEnergy;
+  var energyBurnSun = energyShort * P.SUN_PER_ENERGY;
+
+  var activationSun = input.newRecipient ? P.ACTIVATION_SUN : 0;
+  var memoSun = input.memo ? P.MEMO_SUN : 0;
+
+  var totalSun = netBurnSun + energyBurnSun + activationSun + memoSun;
+
+  var balance = (input.trxBalance === null || input.trxBalance === undefined || input.trxBalance === '') ? null : Number(input.trxBalance);
+  if (balance !== null && (!isFinite(balance) || balance < 0)) balance = null;
+  var balanceSun = balance === null ? null : Math.round(balance * P.SUN_PER_TRX);
+  var canSend = balanceSun === null ? null : balanceSun >= totalSun;
+
+  return {
+    txBytes: txBytes, freeLeft: freeLeft, fromFree: fromFree, fromStaked: fromStaked, bytesShort: bytesShort, netBurnSun: netBurnSun,
+    energyNeed: energyNeed, fromEnergy: fromEnergy, energyShort: energyShort, energyBurnSun: energyBurnSun,
+    activationSun: activationSun, memoSun: memoSun,
+    totalSun: totalSun, totalTrx: sunToTrx(totalSun, P),
+    balanceSun: balanceSun, canSend: canSend
+  };
+}
+
+function sunToTrx(sun, prices) {
+  var P = prices || PRICES;
+  // 부동소수점 오차 없이 문자열로: 정수부 + 소수부 6자리(뒤 0 제거)
+  var whole = Math.floor(sun / P.SUN_PER_TRX);
+  var frac = sun % P.SUN_PER_TRX;
+  if (frac === 0) return String(whole);
+  var fracStr = String(frac);
+  while (fracStr.length < 6) fracStr = '0' + fracStr;
+  return whole + '.' + fracStr.replace(/0+$/, '');
+}
+
+function fmt(n) {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+// 초등용 그림: 입장권 1장(🎫) = 종이 입장권 50 bytes, 기계 입장권 1장(🎟️) = 에너지 5,000, 사탕상자 1개(📦) = 1 TRX
+var PICTURE_UNIT = { NET: 50, ENERGY: 5000, MAX_ICONS: 40 };
+
+function ticketRow(icon, count, unit, maxIcons) {
+  var n = Math.ceil(count / unit);
+  var shown = Math.min(n, maxIcons);
+  var s = '';
+  for (var i = 0; i < shown; i++) s += icon;
+  if (n > shown) s += ' …(+' + fmt(n - shown) + ')';
+  return { icons: s, n: n };
+}
+
+function kidPicture(r) {
+  var need = ticketRow('🎫', r.txBytes, PICTURE_UNIT.NET, PICTURE_UNIT.MAX_ICONS);
+  var have = ticketRow('🎫', r.fromFree + r.fromStaked, PICTURE_UNIT.NET, PICTURE_UNIT.MAX_ICONS);
+  var eNeed = ticketRow('🎟️', r.energyNeed, PICTURE_UNIT.ENERGY, PICTURE_UNIT.MAX_ICONS);
+  var eHave = ticketRow('🎟️', r.fromEnergy, PICTURE_UNIT.ENERGY, PICTURE_UNIT.MAX_ICONS);
+  var boxes = ticketRow('📦', r.totalSun, PRICES.SUN_PER_TRX, PICTURE_UNIT.MAX_ICONS);
+
+  var story;
+  if (r.canSend === false) {
+    story = '토리: "사탕상자가 모자라요!" 노드 아저씨: "입장권이 없으면 사탕상자를 태워야 하는데, 사탕상자가 ' + sunToTrx(r.balanceSun) + '개뿐이구나. 우체통은 안 열려."';
+  } else if (r.totalSun === 0) {
+    story = '토리: "입장권으로 다 됐어요!" 노드 아저씨: "그래, 오늘은 사탕상자를 하나도 안 태워도 돼."';
+  } else {
+    story = '노드 아저씨: "입장권이 ' + (r.bytesShort > 0 ? '종이 ' + fmt(r.bytesShort) + '장' : '') + (r.bytesShort > 0 && r.energyShort > 0 ? ', ' : '') + (r.energyShort > 0 ? '기계 ' + fmt(r.energyShort) + '장' : '') + (r.bytesShort + r.energyShort > 0 ? ' 모자라니 ' : '') + '사탕상자 ' + r.totalTrx + '개(사탕 ' + fmt(r.totalSun) + '알)를 태워야 해."';
+  }
+
+  return (
+    '<p><strong>편지에 필요한 종이 입장권:</strong> ' + fmt(r.txBytes) + '장</p>' +
+    '<div class="tickets" aria-label="필요한 종이 입장권 ' + fmt(r.txBytes) + '장, 그림 ' + need.n + '개">' + need.icons + '</div>' +
+    '<p><strong>내가 가진 종이 입장권으로 낸 만큼:</strong> ' + fmt(r.fromFree + r.fromStaked) + '장 (무료 ' + fmt(r.fromFree) + ' + 맡겨서 생긴 ' + fmt(r.fromStaked) + ')</p>' +
+    '<div class="tickets" aria-label="가진 종이 입장권으로 낸 ' + fmt(r.fromFree + r.fromStaked) + '장, 그림 ' + have.n + '개">' + (have.icons || '<span class="rest">(0장)</span>') + '</div>' +
+    '<p><strong>자판기(컨트랙트)에 필요한 기계 입장권:</strong> ' + fmt(r.energyNeed) + '장 · 가진 것으로 낸 만큼 ' + fmt(r.fromEnergy) + '장</p>' +
+    '<div class="tickets" aria-label="필요한 기계 입장권 ' + fmt(r.energyNeed) + '장, 그림 ' + eNeed.n + '개">' + (eNeed.icons || '<span class="rest">(자판기 안 씀, 0장)</span>') + '</div>' +
+    (r.energyNeed > 0 ? '<div class="tickets" aria-label="가진 기계 입장권으로 낸 ' + fmt(r.fromEnergy) + '장, 그림 ' + eHave.n + '개">' + (eHave.icons || '<span class="rest">(가진 기계 입장권 0장)</span>') + '</div>' : '') +
+    '<p><strong>태우는 사탕상자:</strong> ' + r.totalTrx + '개 = 사탕 ' + fmt(r.totalSun) + '알</p>' +
+    '<div class="tickets" aria-label="태우는 사탕상자 ' + r.totalTrx + '개">' + (boxes.icons || '<span class="rest">(0개, 태우지 않아요)</span>') + '</div>' +
+    '<p class="legend">그림 규칙: 🎫 1개 = 종이 입장권 ' + PICTURE_UNIT.NET + '장(bytes), 🎟️ 1개 = 기계 입장권 ' + fmt(PICTURE_UNIT.ENERGY) + '장(energy), 📦 1개 = 사탕상자 1개(1 TRX, 올림). 그림은 최대 ' + PICTURE_UNIT.MAX_ICONS + '개까지만 그려요.</p>' +
+    '<p class="story">' + escapeHtml(story) + '</p>'
+  );
+}
+
+function resultRows(r) {
+  var rows = [
+    { item: '종이 입장권(대역폭) 부족분', calc: fmt(r.txBytes) + ' bytes − 무료 ' + fmt(r.fromFree) + ' − 스테이킹 ' + fmt(r.fromStaked) + ' = ' + fmt(r.bytesShort) + ' bytes × 1,000 sun', sun: r.netBurnSun },
+    { item: '기계 입장권(에너지) 부족분', calc: fmt(r.energyNeed) + ' − 보유 ' + fmt(r.fromEnergy) + ' = ' + fmt(r.energyShort) + ' energy × 100 sun', sun: r.energyBurnSun },
+    { item: '새 계정 활성화', calc: r.activationSun ? '처음 받는 주소 → 1 TRX' : '이미 활성화된 주소 → 0', sun: r.activationSun },
+    { item: '메모(data) 수수료', calc: r.memoSun ? '메모 있음 → 1 TRX' : '메모 없음 → 0', sun: r.memoSun }
+  ];
+  return rows;
+}
+
+function verdictText(r) {
+  if (r.canSend === null) {
+    return { cls: '', head: 'ℹ️ 보유 TRX를 넣으면 "보낼 수 있나?"를 판정해요.', body: '태워야 하는 사탕상자: ' + r.totalTrx + ' TRX (' + fmt(r.totalSun) + ' sun).' };
+  }
+  if (r.canSend) {
+    return { cls: 'ok', head: '✅ 보낼 수 있음 — 보유 ' + sunToTrx(r.balanceSun) + ' TRX ≥ 필요 ' + r.totalTrx + ' TRX', body: r.totalSun === 0 ? '입장권만으로 충분해서 사탕상자를 하나도 안 태워요.' : '보낸 뒤 남는 TRX: 약 ' + sunToTrx(r.balanceSun - r.totalSun) + ' TRX. 실제 정산은 receipt로 확인하세요.' };
+  }
+  return { cls: 'no', head: '❌ 보낼 수 없음 — 보유 ' + sunToTrx(r.balanceSun) + ' TRX < 필요 ' + r.totalTrx + ' TRX', body: '규칙 4: USDT만 있고 TRX가 0이면 아무것도 못 보낸다. 연료(입장권)가 먼저다. 부족한 TRX: ' + sunToTrx(r.totalSun - r.balanceSun) + ' TRX. USDT 잔고가 아무리 많아도 연료가 되지 않아요.' };
+}
+
+function codeText(r) {
+  return [
+    '// Lesson 04 script.js 와 같은 식 (sun 단위 정수 계산)',
+    'const SUN_PER_BYTE = 1000, SUN_PER_ENERGY = 100, FREE_NET = 600;',
+    'const bytesShort  = Math.max(0, ' + r.txBytes + ' - (' + r.freeLeft + ' /* 무료 남음 */ + ' + fmt(r.fromStaked) + ' /* 스테이킹 */));  // ' + r.bytesShort,
+    'const energyShort = Math.max(0, ' + r.energyNeed + ' - ' + r.fromEnergy + ');  // ' + r.energyShort,
+    'const burnSun = bytesShort * SUN_PER_BYTE   // ' + fmt(r.netBurnSun),
+    '              + energyShort * SUN_PER_ENERGY // ' + fmt(r.energyBurnSun),
+    '              + ' + r.activationSun + ' /* 활성화 */ + ' + r.memoSun + ' /* 메모 */;',
+    '// burnSun = ' + fmt(r.totalSun) + ' sun → TronWeb.fromSun(burnSun) = ' + r.totalTrx + ' TRX',
+    '// 실제 값은 getChainParameters 로 읽고, 정산은 receipt(net_fee, energy_fee)로 확인'
+  ].join('\n');
+}
+
+// ===== 브라우저 전용 =====
+function initBoard(doc) {
+  var form = doc.getElementById('calc-form');
+  var fields = ['txBytes', 'freeUsed', 'stakedNet', 'energyNeed', 'energyHave', 'newRecipient', 'memo', 'trxBalance'];
+  var scenRow = doc.getElementById('scen-row');
+  var scenNote = doc.getElementById('scen-note');
+  var currentScenario = null;
+
+  var priceUl = doc.getElementById('price-list');
+  PRICE_ROWS.forEach(function (p) {
+    var li = doc.createElement('li');
+    li.innerHTML = '<strong>' + escapeHtml(p.label) + '</strong>: ' + escapeHtml(p.value) + ' <code>' + escapeHtml(p.key) + '</code>';
+    priceUl.appendChild(li);
+  });
+
+  SCENARIOS.forEach(function (s) {
+    var b = doc.createElement('button');
+    b.type = 'button';
+    b.dataset.key = s.key;
+    b.textContent = s.label;
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', function () { applyScenario(s); });
+    scenRow.appendChild(b);
+  });
+
+  function readInput() {
+    var el = function (id) { return doc.getElementById(id); };
+    return {
+      txBytes: el('txBytes').value,
+      freeUsed: el('freeUsed').value,
+      stakedNet: el('stakedNet').value,
+      energyNeed: el('energyNeed').value,
+      energyHave: el('energyHave').value,
+      newRecipient: el('newRecipient').checked,
+      memo: el('memo').checked,
+      trxBalance: el('trxBalance').value === '' ? null : el('trxBalance').value
+    };
+  }
+
+  function writeInput(values) {
+    fields.forEach(function (id) {
+      var el = doc.getElementById(id);
+      if (el.type === 'checkbox') el.checked = !!values[id];
+      else el.value = (values[id] === null || values[id] === undefined) ? '' : values[id];
+    });
+  }
+
+  function markScenario(key) {
+    currentScenario = key;
+    var buttons = scenRow.querySelectorAll('button');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute('aria-pressed', buttons[i].dataset.key === key ? 'true' : 'false');
+    }
+  }
+
+  function applyScenario(s) {
+    writeInput(s.values);
+    markScenario(s.key);
+    scenNote.textContent = '✔ ' + s.label + ' — ' + s.note;
+    render();
+  }
+
+  function render() {
+    var r = calcFee(readInput(), PRICES);
+    var body = doc.getElementById('result-body');
+    var html = resultRows(r).map(function (row) {
+      var zero = row.sun === 0 ? ' class="zero"' : '';
+      return '<tr' + zero + '><td>' + escapeHtml(row.item) + '</td><td>' + escapeHtml(row.calc) + '</td><td class="num">' + fmt(row.sun) + '</td><td class="num">' + sunToTrx(row.sun) + '</td></tr>';
+    }).join('');
+    html += '<tr class="total"><td>합계 (태우는 사탕)</td><td>' + fmt(r.netBurnSun) + ' + ' + fmt(r.energyBurnSun) + ' + ' + fmt(r.activationSun) + ' + ' + fmt(r.memoSun) + '</td><td class="num">' + fmt(r.totalSun) + ' sun</td><td class="num">' + r.totalTrx + ' TRX</td></tr>';
+    body.innerHTML = html;
+
+    var v = verdictText(r);
+    var vEl = doc.getElementById('verdict');
+    vEl.className = 'verdict' + (v.cls ? ' ' + v.cls : '');
+    vEl.innerHTML = escapeHtml(v.head) + '<p>' + escapeHtml(v.body) + '</p>';
+
+    doc.getElementById('kid-view').innerHTML = kidPicture(r);
+    doc.getElementById('code-view').textContent = codeText(r);
+  }
+
+  form.addEventListener('submit', function (e) { e.preventDefault(); render(); });
+  form.addEventListener('input', function () {
+    if (currentScenario) { markScenario(null); scenNote.textContent = '(직접 입력 중 — 시나리오 선택 해제)'; }
+    render();
+  });
+  doc.getElementById('reset-btn').addEventListener('click', function () {
+    writeInput(DEFAULTS);
+    markScenario(null);
+    scenNote.textContent = '기본값으로 되돌렸어요.';
+    render();
+    doc.getElementById('txBytes').focus();
+  });
+
+  render();
+}
+
+if (typeof document !== 'undefined') {
+  initBoard(document);
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { PRICES, PRICE_ROWS, DEFAULTS, SCENARIOS, PICTURE_UNIT, calcFee, sunToTrx, fmt, escapeHtml, ticketRow, kidPicture, resultRows, verdictText, codeText };
+}
+</script>
+</body>
+</html>
