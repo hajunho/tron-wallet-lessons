@@ -151,7 +151,8 @@ tron-wallet-lessons/
     ├── paths/                대상별 학습 경로 4개
     ├── slides-outline.md     감마용 50장 슬라이드 아웃라인
     ├── wallet-app-walkthrough.md  지갑 앱 화면 읽는 법
-    └── ci/                   주 1회 자동 재검증 워크플로 (켜는 방법은 ci/README.md)
+    ├── ci/                   주 1회 자동 재검증 워크플로 (켜는 방법은 ci/README.md)
+    └── making/               제작 기록 (검증 사실, 집필 규약, 검수 기록) — 배우는 데는 불필요
 ```
 
 ---
@@ -180,6 +181,8 @@ npm run expected            # expected-output.txt 재생성
 2026-09-12 기준 13/13 통과했습니다. 테스트넷 숫자(가스 가격, 데모 주소 잔고, 블록 번호)는 시간이 지나면 달라집니다. 값이 문서와 다르면 장부가 자란 것이지 고장이 아닙니다. 매주 월요일 GitHub Actions가 다시 검증합니다.
 
 검증 환경: Node 23.11, tronweb 6.5.0, ethers 6.17.0, bip39 3.1.0.
+
+문서의 모든 수치와 출력이 어디서 나왔는지는 [docs/making/verified-facts.md](docs/making/verified-facts.md)에 있습니다. 검증되지 않은 것은 본문에서 `(확인 필요)`로 표시했습니다. 만든 과정과 남은 일, 다른 체인으로 옮기는 방법은 [docs/making/making-of.md](docs/making/making-of.md)에 적었습니다.
 
 ---
 
